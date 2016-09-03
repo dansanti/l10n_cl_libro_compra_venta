@@ -571,7 +571,6 @@ version="1.0">
         return cadena
 
     def getResumen(self, rec):
-        no_product = False
         if rec.document_class_id.sii_code in [56,64] or self.tipo_operacion in ['COMPRA']:
             ob = self.env['account.invoice']
             ref = ob.search([('number','=',rec.document_number)])
@@ -581,7 +580,8 @@ version="1.0">
         det = collections.OrderedDict()
         det['TpoDoc'] = rec.document_class_id.sii_code
         #det['Emisor']
-        #det['IndFactCompra']
+        #if rec.document_class_id.sii_code in['55','56','60','61'] :@TODO buscar documento de referencia
+            #det['IndFactCompra']#si la nota de credito o debito afecta a factura de compra
         if self.tipo_operacion in ['COMPRA']:
             det['NroDoc'] = int(rec.ref)
         else:
@@ -654,17 +654,14 @@ version="1.0">
                 det['OtrosImp']['CodImp'] = tasa.sii_code
                 det['OtrosImp']['TasaImp'] = tasa.amount
                 det['OtrosImp']['MntImp'] = int(round(TaxMnt))
-        if tasa and tasa.sii_type in ['R']:
-            if tasa.retencion == tasa.amount:
-                det['IVARetTotal'] = int(round(TaxMnt))
+            if tasa and tasa.sii_type in ['R']:
+                if tasa.retencion == tasa.amount:
+                    det['IVARetTotal'] = int(round(TaxMnt))
+                else:
+                    det['IVARetParcial'] = int(round(Neto * (tasa.retencion / 100)))
+                    det['IVANoRetenido'] = int(round(TaxMnt - (Neto * (tasa.retencion / 100))))
                 TaxMnt = 0
-            else:
-                det['IVARetParcial'] = int(round(Neto * (tasa.retencion / 100)))
-                det['IVANoRetenido'] = int(round(TaxMnt - (Neto * (tasa.retencion / 100))))
-                TaxMnt -= det['IVARetParcial']
         monto_total = int(round((Neto + MntExe + TaxMnt), 0))
-        if no_product :
-            monto_total = 0
         det['MntTotal'] = monto_total
         return det
 
@@ -761,11 +758,11 @@ version="1.0">
                 #tot['TotOtrosImp']['TotCredImp']  = TaxMnt
                 itemOtrosImp.extend([tot])
             resumenP['itemOtrosImp'] = itemOtrosImp
-        if 'IVARetTotal' in resumen and not 'TotOpIVARetTotal' in resumenP:
+        if 'IVARetTotal' in resumen and not 'TotIVARetTotal' in resumenP:
             resumenP['TotIVARetTotal'] = resumen['IVARetTotal']
         elif 'IVARetTotal' in resumen:
             resumenP['TotIVARetTotal'] += resumen['IVARetTotal']
-        if 'IVARetParcial' in resumen and not 'TotOpIVARetParcial' in resumenP:
+        if 'IVARetParcial' in resumen and not 'TotIVARetParcial' in resumenP:
             resumenP['TotIVARetParcial'] = resumen['IVARetParcial']
             resumenP['TotIVANoRetenido'] = resumen['IVANoRetenido']
         elif 'IVARetParcial' in resumen:
