@@ -9,12 +9,14 @@
         'account_accountant',
         'l10n_cl_invoice',
         'l10n_cl_base_rut',
-        'l10n_cl_partner_activities'
+        'l10n_cl_partner_activities',
+        'report_xlsx'
         ],
     'description': u'''
 \n\nMódulo de Facturación de la localización Chilena.\n\n\nIncluye:\n
-- Configuraci\xc3\xb3n de libros, diarios (journals) y otros detalles para facturación para Chile.\n
+- Configuración de libros, diarios (journals) y otros detalles para facturación para Chile.\n
 - Asistente para configurar los talonarios de facturas, boletas, guías de despacho, etc.
+- obtener módulo de exportación xlsx "Base report xlsx" desde https://github.com/OCA/reporting-engine
 ''',
     'init_xml': [],
     'installable': True,
@@ -23,8 +25,9 @@
     'test': [],
     'data': [
         'views/libro_compra_venta.xml',
+        'views/export.xml',
         'wizard/build_and_send_moves.xml',
         'security/ir.model.access.csv',
         ],
-    'version': '9.0.1.1',
+    'version': '9.0.2.0',
 }
