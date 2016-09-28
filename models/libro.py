@@ -26,40 +26,22 @@ try:
 except:
     from StringIO import StringIO
 
-# ejemplo de suds
 import traceback as tb
 import suds.metrics as metrics
-#from tests import *
-#from suds import WebFault
-#from suds.client import Client
-# from suds.sax.text import Raw
-# import suds.client as sudscl
 
 try:
     from suds.client import Client
 except:
     pass
-# from suds.transport.https import WindowsHttpAuthenticated
-# from suds.cache import ObjectCache
-
-# ejemplo de suds
-
-# intento con urllib3
 try:
     import urllib3
 except:
     pass
 
-# from urllib3 import HTTPConnectionPool
 #urllib3.disable_warnings()
-pool = urllib3.PoolManager()
-# ca_certs = "/etc/ssl/certs/ca-certificates.crt"
-# pool = urllib3.PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=ca_certs)
-import textwrap
+pool = urllib3.PoolManager(timeout=30)
 
-# from inspect import currentframe, getframeinfo
-# estas 2 lineas son para imprimir el numero de linea del script
-# (solo para debug)
+import textwrap
 
 _logger = logging.getLogger(__name__)
 
@@ -212,8 +194,11 @@ class Libro(models.Model):
     def get_seed(self, company_id):
         #En caso de que haya un problema con la validación de certificado del sii ( por una mala implementación de ellos)
         #esto omite la validacion
-        import ssl
-        ssl._create_default_https_context = ssl._create_unverified_context
+        try:
+            import ssl
+            ssl._create_default_https_context = ssl._create_unverified_context
+        except:
+            pass
         url = server_url[company_id.dte_service_provider] + 'CrSeed.jws?WSDL'
         ns = 'urn:'+server_url[company_id.dte_service_provider] + 'CrSeed.jws'
         _server = SOAPProxy(url, ns)
@@ -809,6 +794,7 @@ version="1.0">
                   'TotIVARetParcial', 'TotMntTotal', 'TotIVANoRetenido',
                  'TotTabPuros', 'TotTabCigarrillos', 'TotTabElaborado', 'TotImpVehiculo',]
         ResumenPeriodo=[]
+        _logger.info(resumenesPeriodo)
         for r, value in resumenesPeriodo.iteritems():
             total = collections.OrderedDict()
             for v in lista:
