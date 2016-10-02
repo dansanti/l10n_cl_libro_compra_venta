@@ -473,14 +473,15 @@ version="1.0">
             'target': 'self',
         }
 
-    '''
-    Funcion para reformateo del vat desde modo Odoo (dos digitos pais sin guion)
-    a valor sin puntuacion con guion
-     @author: Daniel Blanco Martin (daniel[at]blancomartin.cl)
-     @version: 2016-05-01
-    '''
     def format_vat(self, value):
-        return value[2:10] + '-' + value[10:]
+        ''' Se Elimina el 0 para prevenir problemas con el sii, ya que las muestras no las toma si va con
+        el 0 , y tambien internamente se generan problemas'''
+        if not value or value == '' or value == 0:
+            value ="CL666666666"
+            #@TODO opción de crear código de cliente en vez de rut genérico
+        rut = value[:10] + '-' + value[10:]
+        rut = rut.replace('CL0','').replace('CL','')
+        return rut
 
     '''
     Funcion usada en SII
