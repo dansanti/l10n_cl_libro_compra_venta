@@ -1,8 +1,4 @@
 # -*- coding: utf-8 -*-
-##############################################################################
-# For copyright and license notices, see __openerp__.py file in module root
-# directory
-##############################################################################
 
 from openerp import fields, models, api, _
 from openerp.exceptions import UserError
@@ -12,7 +8,6 @@ from lxml import etree
 from lxml.etree import Element, SubElement
 from lxml import objectify
 from lxml.etree import XMLSyntaxError
-from openerp import SUPERUSER_ID
 
 import xml.dom.minidom
 import pytz
@@ -112,8 +107,8 @@ connection_status = {
     'Otro': 'Error Interno.',
 }
 
-class Libro(models.Model):
-    _name = "account.move.book"
+class ConsumoFolios(models.Model):
+    _name = "account.move.consumo_folios"
 
     sii_message = fields.Text(
         string='SII Message',
@@ -156,58 +151,24 @@ class Libro(models.Model):
     move_ids = fields.Many2many('account.move',
     	readony=True,
         states={'draft': [('readonly', False)]},)
-
-    tipo_libro = fields.Selection([
-                ('ESPECIAL','Especial'),
-                ('MENSUAL','Mensual'),
-                ],
-                string="Tipo de Libro",
-                default='MENSUAL',
-                required=True,
-                readony=True,
-        		states={'draft': [('readonly', False)]},
-            )
-    tipo_operacion = fields.Selection([
-                ('COMPRA','Compras'),
-                ('VENTA','Ventas'),
-                ('BOLETA','Boleta'),
-                ],
-                string="Tipo de operación",
-                default="COMPRA",
-                required=True,
-                readony=True,
-        		states={'draft': [('readonly', False)]},
-            )
-    tipo_envio = fields.Selection([
-                ('AJUSTE','Ajuste'),
-                ('TOTAL','Total'),
-                ('PARCIAL','Parcial'),
-                ('TOTAL','Total'),
-                ],
-                string="Tipo de Envío",
-                default="TOTAL",
-                required=True,
-                readony=True,
-    			states={'draft': [('readonly', False)]},
-            )
-    folio_notificacion = fields.Char(string="Folio de Notificación",
+    fecha_inicio = fields.Date(string="Fecha Inicio",
+    	readony=True,
+        states={'draft': [('readonly', False)]},)
+    fecha_final = fields.Date(string="Fecha Final",
+    	readony=True,
+        states={'draft': [('readonly', False)]},)
+    correlativo = fields.Integer(string="Correlativo",
+    	readony=True,
+        states={'draft': [('readonly', False)]},)
+    sec_envio = fields.Integer(string="Secuencia de Envío",
     	readony=True,
         states={'draft': [('readonly', False)]},)
     #total_afecto = fields.Char(string="Total Afecto")
     #total_exento = fields.Char(string="Total Exento")
-    periodo_tributario = fields.Char('Periodo Tributario', required=True,
-    	readony=True,
-        states={'draft': [('readonly', False)]},)
     company_id = fields.Many2one('res.company', required=True,
     	readony=True,
         states={'draft': [('readonly', False)]},)
     name = fields.Char(string="Detalle" , required=True,
-    	readony=True,
-        states={'draft': [('readonly', False)]},)
-    fact_prop = fields.Float(string="Factor proporcionalidad",
-    	readony=True,
-        states={'draft': [('readonly', False)]},)
-    nro_segmento = fields.Integer(string="Número de Segmento",
     	readony=True,
         states={'draft': [('readonly', False)]},)
     date = fields.Date(string="Date", required=True,
@@ -220,33 +181,26 @@ class Libro(models.Model):
             certf += cert[76 * i:76 * (i + 1)] + '\n'
         return certf
 
-    def create_template_envio(self, RutEmisor, PeriodoTributario, FchResol, NroResol, EnvioDTE,signature_d,TipoOperacion='VENTA',TipoLibro='MENSUAL',TipoEnvio='TOTAL',FolioNotificacion="123", IdEnvio='SetDoc'):
-        if TipoOperacion == 'BOLETA' and TipoLibro != 'ESPECIAL':
-            raise UserError("Boletas debe ser solamente Tipo Operación ESPECIAL")
-        if TipoLibro in ['ESPECIAL'] or TipoOperacion in ['BOLETA']:
-            FolioNotificacion = '<FolioNotificacion>{0}</FolioNotificacion>'.format(FolioNotificacion)
+    def create_template_envio(self, RutEmisor, FchResol, NroResol, FchInicio, FchFinal, Correlativo, SecEnvio, EnvioDTE, signature_d, IdEnvio='SetDoc'):
+        if Correlativo != 0:
+            Correlativo = "<Correlativo>"+Correlativo+"</Correlativo>"
         else:
-            FolioNotificacion = ''
-
-        if TipoOperacion in ['BOLETA']:
-            TipoOperacion = ''
-        else:
-            TipoOperacion = '<TipoOperacion>'+TipoOperacion+'</TipoOperacion>'
-        xml = '''<EnvioLibro ID="{10}">
-<Caratula>
-<RutEmisorLibro>{0}</RutEmisorLibro>
+            Correlativo = ''
+        xml = '''<DocumentoConsumoFolios ID="{10}">
+<Caratula  version="1.0" >
+<RutEmisor>{0}</RutEmisor>
 <RutEnvia>{1}</RutEnvia>
-<PeriodoTributario>{2}</PeriodoTributario>
-<FchResol>{3}</FchResol>
-<NroResol>{4}</NroResol>{5}
-<TipoLibro>{6}</TipoLibro>
-<TipoEnvio>{7}</TipoEnvio>
-{8}
+<FchResol>{2}</FchResol>
+<NroResol>{3}</NroResol>
+<FchInicio>{4}</FchInicio>
+<FchFinal>{5}</FchFinal>{6}
+<SecEnvio>{7}</SecEnvio>
+<TmstFirmaEnv>{8}</TmstFirmaEnv>
 </Caratula>
 {9}
-</EnvioLibro>
-'''.format(RutEmisor, signature_d['subject_serial_number'], PeriodoTributario,
-           FchResol, NroResol,TipoOperacion, TipoLibro,TipoEnvio,FolioNotificacion, EnvioDTE,IdEnvio)
+</DocumentoConsumoFolios>
+'''.format(RutEmisor, signature_d['subject_serial_number'],
+           FchResol, NroResol, FchInicio, FchFinal, Correlativo, SecEnvio, self.time_stamp(), EnvioDTE,  IdEnvio)
         return xml
 
     def time_stamp(self, formato='%Y-%m-%dT%H:%M:%S'):
@@ -267,12 +221,8 @@ class Libro(models.Model):
 
     def xml_validator(self, some_xml_string, validacion='doc'):
         validacion_type = {
-            'doc': 'DTE_v10.xsd',
-            'env': 'EnvioDTE_v10.xsd',
+            'consu': 'ConsumoFolio_v10.xsd',
             'sig': 'xmldsignature_v10.xsd',
-            'libro': 'LibroCV_v10.xsd',
-            'libroS': 'LibroCVS_v10.xsd',
-            'libro_boleta': 'LibroBOLETA_v10.xsd',
         }
         xsd_file = xsdpath+validacion_type[validacion]
         try:
@@ -324,24 +274,20 @@ class Libro(models.Model):
 '''.format(seed)
         return xml
 
+    '''
+    Funcion usada en autenticacion en SII
+    Creacion de plantilla xml para envolver el Envio de DTEs
+    Previo a realizar su firma (2da)
+     @author: Daniel Blanco Martin (daniel[at]blancomartin.cl)
+     @version: 2016-06-01
+    '''
     def create_template_env(self, doc,simplificado=False):
-        simp = 'http://www.sii.cl/SiiDte LibroCV_v10.xsd'
-        if simplificado:
-            simp ='http://www.sii.cl/SiiDte LibroCVS_v10.xsd'
-        xml = '''<LibroCompraVenta xmlns="http://www.sii.cl/SiiDte" \
+        xsd = 'http://www.sii.cl/SiiDte ConsumoFolio_v10.xsd'
+        xml = '''<ConsumoFolios xmlns="http://www.sii.cl/SiiDte" \
 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" \
 xsi:schemaLocation="{0}" \
 version="1.0">
-{1}</LibroCompraVenta>'''.format(simp, doc)
-        return xml
-
-    def create_template_env_boleta(self, doc):
-        xsd = 'http://www.sii.cl/SiiDte LibroBOLETA_v10.xsd'
-        xml = '''<LibroBoleta xmlns="http://www.sii.cl/SiiDte" \
-xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" \
-xsi:schemaLocation="{0}" \
-version="1.0">
-{1}</LibroBoleta>'''.format(xsd, doc)
+{1}</ConsumoFolios>'''.format(xsd, doc)
         return xml
 
     '''
@@ -416,7 +362,7 @@ version="1.0">
             s = (blocksize - len(s) % blocksize) * b'\000' + s
         return s
 
-    def sign_full_xml(self, message, privkey, cert, uri, type='libro'):
+    def sign_full_xml(self, message, privkey, cert, uri, type='consu'):
         doc = etree.fromstring(message)
         string = etree.tostring(doc[0])
         mess = etree.tostring(etree.fromstring(string), method="c14n")
@@ -435,8 +381,7 @@ version="1.0">
         att = 'xmlns="http://www.w3.org/2000/09/xmldsig#" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'
         #@TODO Find better way to add xmlns:xsi attrib
         signed_info_c14n = signed_info_c14n.replace("<SignedInfo>","<SignedInfo " + att + ">")
-        xmlns = 'http://www.w3.org/2000/09/xmldsig#'
-        sig_root = Element("Signature",attrib={'xmlns':xmlns})
+        sig_root = Element("Signature",attrib={'xmlns':'http://www.w3.org/2000/09/xmldsig#'})
         sig_root.append(etree.fromstring(signed_info_c14n))
         signature_value = SubElement(sig_root, "SignatureValue")
         from cryptography.hazmat.backends import default_backend
@@ -459,20 +404,10 @@ version="1.0">
         x509_certificate = SubElement(x509_data, "X509Certificate")
         x509_certificate.text = '\n'+textwrap.fill(cert,64)
         msg = etree.tostring(sig_root)
-        if type != 'libro_boleta':
-            msg = msg if self.xml_validator(msg, 'sig') else ''
-        if type == 'libro':
-            fulldoc = message.replace('</LibroCompraVenta>',msg+'\n</LibroCompraVenta>')
-        elif type == 'libro_boleta':
-            resp = fulldoc = message.replace('</LibroBoleta>',msg+'\n</LibroBoleta>')
-            xmlns = 'xmlns="http://www.w3.org/2000/09/xmldsig#"'
-            xmlns_sii = 'xmlns="http://www.sii.cl/SiiDte"'
-            msg = msg.replace(xmlns, xmlns_sii)
-            fulldoc = message.replace('</LibroBoleta>',msg+'\n</LibroBoleta>')
+        msg = msg if self.xml_validator(msg, 'sig') else ''
+        fulldoc = message.replace('</ConsumoFolios>',msg+'\n</ConsumoFolios>')
         fulldoc = '<?xml version="1.0" encoding="ISO-8859-1"?>\n'+fulldoc
         fulldoc = fulldoc if self.xml_validator(fulldoc, type) else ''
-        if type == 'libro_boleta':# es feo, pero repara el problema de validacion mla creada del sii
-            return '<?xml version="1.0" encoding="ISO-8859-1"?>\n'+resp
         return fulldoc
 
     def get_digital_signature_pem(self, comp_id):
@@ -524,6 +459,7 @@ version="1.0">
     def send_xml_file(self, envio_dte=None, file_name="envio",company_id=False):
         if not company_id.dte_service_provider:
             raise UserError(_("Not Service provider selected!"))
+
         try:
             signature_d = self.get_digital_signature_pem(
                 company_id)
@@ -609,12 +545,14 @@ version="1.0">
 
     @api.onchange('periodo_tributario','tipo_operacion')
     def _setName(self):
+        if self.name:
+            return
         self.name = self.tipo_operacion
         if self.periodo_tributario:
             self.name += " " + self.periodo_tributario
 
     @api.multi
-    def validar_libro(self):
+    def validar_consumo_folios(self):
         return self.write({'state': 'NoEnviado'})
 
     def _acortar_str(self, texto, size=1):
@@ -626,26 +564,9 @@ version="1.0">
         return cadena
 
     def getResumen(self, rec):
-        no_product = False
-        if rec.document_class_id.sii_code in [56,64] or self.tipo_operacion in ['COMPRA']:
-            ob = self.env['account.invoice']
-            ref = ob.search([('number','=',rec.document_number)])
-            referencia = self.env['account.move'].search([('document_number','=',ref.origin)])
-        else:
-            referencia = self.env['account.invoice'].search([('number','=',rec.document_number)])
         det = collections.OrderedDict()
         det['TpoDoc'] = rec.document_class_id.sii_code
-        #det['Emisor']
-        #det['IndFactCompra']
-        if self.tipo_operacion in ['COMPRA']:
-            det['NroDoc'] = int(rec.ref)
-        else:
-            det['NroDoc'] = int(rec.sii_document_number)
-        #if rec.is_anulation:
-        #    det['Anulado'] = 'A'
-        #det['Operacion']
-        #det['TotalesServicio']
-        imp = {}
+        det['NroDoc'] = int(rec.sii_document_number)
         Neto = 0
         MntExe = 0
         TaxMnt = 0
@@ -668,261 +589,114 @@ version="1.0">
                     MntExe += l.credit
                 else:
                     MntExe += l.debit
-        if tasa :
-            if tasa.sii_code in [14]:
-                det['TpoImp'] = 1
-            #elif tasa.sii_code in []: determinar cuando es 18.211 // zona franca
-            #    det['TpoImp'] = 2
-            det['TasaImp'] = round(tasa.amount,2)
-        #det['IndServicio']
-        #det['IndSinCosto']
-        det['FchDoc'] = rec.date
-        if 1==2:#@TODO Sucursales
-            det['CdgSIISucur']=False
-        det['RUTDoc'] = self.format_vat(rec.partner_id.vat)
-        det['RznSoc'] = rec.partner_id.name[:50]
-        if referencia:
-            if self.tipo_operacion in ['COMPRA']:
-                det['TpoDocRef'] = referencia.document_class_id.sii_code
-                det['FolioDocRef'] = referencia.ref
-            else:
-                det['TpoDocRef'] = referencia.journal_document_class_id.sii_code
-                det['FolioDocRef'] = referencia.origin
         if MntExe > 0 :
             det['MntExe'] = int(round(MntExe,0))
-        elif self.tipo_operacion in ['VENTA'] and not Neto > 0:
-            det['MntExe'] = 0
-        if Neto > 0:
-            det['MntNeto'] = int(round(Neto))
-            if tasa.sii_code in [14] or tasa.sii_type: # Es algún tipo de iva que puede ser adicional anticipado
-                if rec.no_rec_code or rec.iva_uso_comun:
-                    det['MntIVA'] = 0
-                else:
-                    det['MntIVA'] = int(round(TaxMnt))
-                if rec.no_rec_code:
-                    det['IVANoRec'] = collections.OrderedDict()
-                    det['IVANoRec']['CodIVANoRec'] = rec.no_rec_code
-                    det['IVANoRec']['MntIVANoRec'] = int(round(TaxMnt))
-                if rec.iva_uso_comun:
-                    det['IVAUsoComun'] = int(round(TaxMnt))
-            elif tasa.sii_code not in [0,14]:#niva
-                det['OtrosImp'] = collections.OrderedDict()
-                det['OtrosImp']['CodImp'] = tasa.sii_code
-                det['OtrosImp']['TasaImp'] = tasa.amount
-                det['OtrosImp']['MntImp'] = int(round(TaxMnt))
-        if tasa and tasa.sii_type in ['R']:
-            if tasa.retencion == tasa.amount:
-                det['IVARetTotal'] = int(round(TaxMnt))
-            else:
-                det['IVARetParcial'] = int(round(Neto * (tasa.retencion / 100)))
-                det['IVANoRetenido'] = int(round(TaxMnt - (Neto * (tasa.retencion / 100))))
+        if TaxMnt > 0:
+            det['MntIVA'] = int(round(TaxMnt))
+            det['TasaIVA'] = tasa.amount
         monto_total = int(round((Neto + MntExe + TaxMnt), 0))
-        if no_product :
-            monto_total = 0
-        det['MntTotal'] = monto_total
-        return det
-
-    def getResumenBoleta(self, rec):
-        det = collections.OrderedDict()
-        det['TpoDoc'] = rec.document_class_id.sii_code
-        det['FolioDoc'] = int(rec.sii_document_number)
-        if self.env['account.invoice.referencias'].search([('origen','=',det['FolioDoc']), ('sii_referencia_TpoDocRef','=', rec.document_class_id.id), ('sii_referencia_CodRef','=','1')]):
-            det['Anulado'] = 'A'
-        det['TpoServ'] = 3
-        det['FchEmiDoc'] = rec.date
-        det['FchVencDoc'] = rec.date
-        #det['PeriodoDesde']
-        #det['PeriodoHasta']
-        #det['CdgSIISucur']
-        Neto = 0
-        MntExe = 0
-        TaxMnt = 0
-        tasa = False
-        for l in rec.line_ids:
-            if l.tax_line_id:
-                if l.tax_line_id and l.tax_line_id.amount > 0: #supuesto iva único
-                    tasa = l.tax_line_id
-                    if l.credit > 0:
-                        TaxMnt += l.credit
-                    else:
-                        TaxMnt += l.debit
-            elif l.tax_ids and l.tax_ids.amount > 0:
-                if l.credit > 0:
-                    Neto += l.credit
-                else:
-                    Neto += l.debit
-            elif l.tax_ids and l.tax_ids.amount == 0: #caso monto exento
-                if l.credit > 0:
-                    MntExe += l.credit
-                else:
-                    MntExe += l.debit
-        #det['IndServicio']
-        #det['IndSinCosto']
-        det['RUTCliente'] = self.format_vat(rec.partner_id.vat)
-        det['TasaIVA'] = tasa.amount
-        #det['CodIntCLi']
-        if MntExe > 0 :
-            det['MntExe'] = int(round(MntExe,0))
-        monto_total = int(round((Neto + MntExe + TaxMnt), 0))
-        det['MntTotal'] = monto_total
         det['MntNeto'] = int(round(Neto))
-        det['MntIVA'] = int(round(TaxMnt))
+        det['MntTotal'] = monto_total
         return det
 
-    def _setResumenPeriodo(self,resumen,resumenP):
-        resumenP['TpoDoc'] = resumen['TpoDoc']
-        if 'TpoImp' in resumen:
-            resumenP['TpoImp'] = resumen['TpoImp'] or 1
-        if not 'TotDoc' in resumenP:
-            resumenP['TotDoc'] = 1
-        else:
-            resumenP['TotDoc'] += 1
-        if 'TotAnulado' in resumenP and 'Anulado' in resumen:
-            resumenP['TotAnulado'] += 1
-            return resumenP
-        elif 'Anulado' in resumen:
-            resumenP['TotAnulado'] = 1
-            return resumenP
-        if 'MntExe' in resumen and not 'TotMntExe' in resumenP:
-            resumenP['TotMntExe'] = resumen['MntExe']
-        elif 'MntExe' in resumen:
-            resumenP['TotMntExe'] += resumen['MntExe']
-        elif not 'TotMntExe' in resumenP:
-            resumenP['TotMntExe'] = 0
-        if 'MntNeto' in resumen and not 'TotMntNeto' in resumenP:
-            resumenP['TotMntNeto'] = resumen['MntNeto']
+    def _nuevo_rango(self, folio, f_contrario, contrarios):
+    	last = last(contrarios)
+    	if last['Inicial'] > f_contrario:
+    		return True
+		return False
+
+
+    def _orden(self, folio, rangos, contrarios):
+    	last = last(rangos)
+		if self._nuevo_rango(folio, last['Final'], contrarios):
+			r = collections.OrderedDict()
+			r['Inicial'] = folio
+			r['Final'] = folio
+			rangos.append(r)
+			return rangos
+
+		result =[]
+		for r in rangos:
+			if r['Final'] == last['Final']:
+				r['Final'] = folio
+			result.append(r)
+		return result
+
+
+	def _rangosU(self, resumen, rangos):	
+		if resumen['A']:
+			if not 'RangoAnulados' in rangos:
+				rangos['RangoAnulados'] = []
+				r = collections.OrderedDict()
+				r['Inicial'] = folio
+				r['Final'] = folio
+				rangos.append(r)
+			elif not 'RangoUtilizados' in rangos:
+				rangos['RangoAnulados'][0]['Final'] = resumen['NroDoc']
+			else:
+				rangos['RangoAnulados'] = self._orden(resumen['NroDoc'], rangos['RangoAnulados'], rangos['RangoUtilizados'] )
+			return rangos
+
+		if not 'RangoUtilizados' in rangos:
+				rangos['RangoUtilizados'] = []
+				r = collections.OrderedDict()
+				r['Inicial'] = folio
+				r['Final'] = folio
+				rangos.append(r)
+		elif not 'RangoAnulados' in rangos:
+			rangos['RangoUtilizados'][0]['Final'] = resumen['NroDoc']
+		else:
+			rangos['RangoUtilizados'] = self._orden(resumen['NroDoc'], rangos['RangoUtilizados'], rangos['RangoAnulados'] )
+		return rangos
+
+
+    def _setResumen(self,resumen,resumenP):
+        resumenP['TipoDocumento'] = resumen['TpoDoc']
+        if 'MntNeto' in resumen and not 'MntNeto' in resumenP:
+            resumenP['MntNeto'] = resumen['MntNeto']
         elif 'MntNeto' in resumen:
-            resumenP['TotMntNeto'] += resumen['MntNeto']
-        elif not 'TotMntNeto' in resumenP:
-            resumenP['TotMntNeto'] = 0
-        if 'TotOpIVARec' in resumen:
-            resumenP['TotOpIVARec'] = resumen['OpIVARec']
-        if 'MntIVA' in resumen and not 'TotMntIVA' in resumenP:
-            resumenP['TotMntIVA'] = resumen['MntIVA']
+            resumenP['MntNeto'] += resumen['MntNeto']
+        elif not 'MntNeto' in resumenP:
+            resumenP['MntNeto'] = 0
+        if 'MntIVA' in resumen and not 'MntIva' in resumenP:
+            resumenP['MntIva'] = resumen['MntIVA']
         elif 'MntIVA' in resumen:
-            resumenP['TotMntIVA'] += resumen['MntIVA']
-        elif not 'TotMntIVA' in resumenP:
-            resumenP['TotMntIVA'] = 0
-        #resumenP['TotOpActivoFijo'] = resumen['TotOpActivoFijo']
-        #resumenP['TotMntIVAActivoFijo'] = resumen['TotMntIVAActivoFijo']
-        if 'IVANoRec' in resumen and not 'itemNoRec' in resumenP:
-            tot = {}
-            tot['TotIVANoRec'] = collections.OrderedDict()
-            tot['TotIVANoRec']['CodIVANoRec'] = resumen['IVANoRec']['CodIVANoRec']
-            tot['TotIVANoRec']['TotOpIVANoRec'] = 1
-            tot['TotIVANoRec']['TotMntIVANoRec'] = resumen['IVANoRec']['MntIVANoRec']
-            resumenP['itemNoRec'] = [tot]
-        elif 'IVANoRec' in resumen:
-            seted = False
-            itemNoRec = []
-            for r in resumenP['itemNoRec']:
-                if r['TotIVANoRec']['CodIVANoRec'] == resumen['IVANoRec']['CodIVANoRec']:
-                    r['TotIVANoRec']['TotOpIVANoRec'] += 1
-                    r['TotIVANoRec']['TotMntIVANoRec'] += resumen['IVANoRec']['MntIVANoRec']
-                    seted = True
-                itemNoRec.extend([r])
-            if not seted:
-                tot = {}
-                tot['TotIVANoRec'] = collections.OrderedDict()
-                tot['TotIVANoRec']['CodIVANoRec'] = resumen['IVANoRec']['CodIVANoRec']
-                tot['TotIVANoRec']['TotOpIVANoRec'] = 1
-                tot['TotIVANoRec']['TotMntIVANoRec'] = resumen['IVANoRec']['MntIVANoRec']
-                itemNoRec.extend([tot])
-            resumenP['itemNoRec'] = itemNoRec
-
-        if 'IVAUsoComun' in resumen and not 'TotOpIVAUsoComun' in resumenP:
-            resumenP['TotOpIVAUsoComun'] = 1
-            resumenP['TotIVAUsoComun'] = resumen['IVAUsoComun']
-            resumenP['FctProp'] = self.fact_prop
-            resumenP['TotCredIVAUsoComun'] = int(round((resumen['IVAUsoComun'] * self.fact_prop )))
-        elif 'IVAUsoComun' in resumen:
-            resumenP['TotOpIVAUsoComun'] += 1
-            resumenP['TotIVAUsoComun'] += resumen['IVAUsoComun']
-            resumenP['TotCredIVAUsoComun'] += int(round((resumen['IVAUsoComun'] * self.fact_prop )))
-        if not 'itemOtrosImp' in resumenP and 'OtrosImp' in resumen :
-            tot = {}
-            tot['TotOtrosImp'] = collections.OrderedDict()
-            tot['TotOtrosImp']['CodImp']  = resumen['OtrosImp']['CodImp']
-            tot['TotOtrosImp']['TotMntImp']  = resumen['OtrosImp']['MntImp']
-            #tot['FctImpAdic']
-            #tot['TotOtrosImp']['TotCredImp']  = TaxMnt
-            resumenP['itemOtrosImp'] = [tot]
-        elif 'OtrosImp' in resumen:
-            seted = False
-            itemOtrosImp = []
-            for r in resumenP['itemOtrosImp']:
-                if r['TotOtrosImp']['CodImp'] == resumen['OtrosImp']['CodImp']:
-                    r['TotOtrosImp']['TotMntImp'] += resumen['OtrosImp']['MntImp']
-                    seted = True
-                itemOtrosImp.extend([r])
-            if not seted:
-                tot = {}
-                tot['TotOtrosImp'] = collections.OrderedDict()
-                tot['TotOtrosImp']['CodImp']  = resumen['OtrosImp']['CodImp']
-                tot['TotOtrosImp']['TotMntImp']  = resumen['MntImp']
-                #tot['FctImpAdic']
-                #tot['TotOtrosImp']['TotCredImp']  = TaxMnt
-                itemOtrosImp.extend([tot])
-            resumenP['itemOtrosImp'] = itemOtrosImp
-        if 'IVARetTotal' in resumen and not 'TotOpIVARetTotal' in resumenP:
-            resumenP['TotIVARetTotal'] = resumen['IVARetTotal']
-        elif 'IVARetTotal' in resumen:
-            resumenP['TotIVARetTotal'] += resumen['IVARetTotal']
-        if 'IVARetParcial' in resumen and not 'TotOpIVARetParcial' in resumenP:
-            resumenP['TotIVARetParcial'] = resumen['IVARetParcial']
-            resumenP['TotIVANoRetenido'] = resumen['IVANoRetenido']
-        elif 'IVARetParcial' in resumen:
-            resumenP['TotIVARetParcial'] += resumen['IVARetParcial']
-            resumenP['TotIVANoRetenido'] += resumen['IVANoRetenido']
-
-        #@TODO otros tipos IVA
-        if not 'TotMntTotal' in resumenP:
-            resumenP['TotMntTotal'] = resumen['MntTotal']
-        else:
-            resumenP['TotMntTotal'] += resumen['MntTotal']
-        return resumenP
-
-    def _setResumenPeriodoBoleta(self, resumen, resumenP):
-        resumenP['TpoDoc'] = resumen['TpoDoc']
-        if 'Anulado' in resumen and 'TotAnulado' in resumenP:
-            resumenP['TotAnulado'] += 1
-            return resumenP
-        elif 'Anulado' in resumen:
-            resumenP['TotAnulado'] = 1
-            return resumenP
-        if not 'TotalesServicio' in resumenP:
-            resumenP['TotalesServicio'] = collections.OrderedDict()
-            resumenP['TotalesServicio']['TpoServ'] = resumen['TpoServ']#@TODO separar por tipo de servicio
-            resumenP['TotalesServicio']['TotDoc'] = 0
-        resumenP['TotalesServicio']['TotDoc'] += 1
-        if 'MntExe' in resumen and not 'TotMntExe' in resumenP['TotalesServicio']:
-            resumenP['TotalesServicio']['TotMntExe'] = resumen['MntExe']
+            resumenP['MntIva'] += resumen['MntIVA']
+        elif not 'MntIva' in resumenP:
+            resumenP['MntIva'] = 0
+        if 'TasaIVA' in resumen and not 'TasaIVA' in resumenP:
+            resumenP['TasaIVA'] = resumen['TasaIVA']
+        if 'MntExe' in resumen and not 'MntExento' in resumenP:
+            resumenP['MntExento'] = resumen['MntExe']
         elif 'MntExe' in resumen:
-            resumenP['TotalesServicio']['TotMntExe'] += resumen['MntExe']
-        elif not 'TotMntExe' in resumenP['TotalesServicio']:
-            resumenP['TotalesServicio']['TotMntExe'] = 0
-        if 'MntNeto' in resumen and not 'TotMntNeto' in resumenP['TotalesServicio']:
-            resumenP['TotalesServicio']['TotMntNeto'] = resumen['MntNeto']
-        elif 'MntNeto' in resumen:
-            resumenP['TotalesServicio']['TotMntNeto'] += resumen['MntNeto']
-        elif not 'TotMntNeto' in resumenP['TotalesServicio']:
-            resumenP['TotalesServicio']['TotMntNeto'] = 0
-        if 'MntIVA' in resumen:
-            resumenP['TotalesServicio']['TasaIVA'] = resumen['TasaIVA']
-        if 'MntIVA' in resumen and not 'TotMntIVA' in resumenP['TotalesServicio']:
-            resumenP['TotalesServicio']['TotMntIVA'] = resumen['MntIVA']
-        elif 'MntIVA' in resumen:
-            resumenP['TotalesServicio']['TotMntIVA'] += resumen['MntIVA']
-        elif not 'TotMntIVA' in resumenP['TotalesServicio']:
-            resumenP['TotalesServicio']['TotMntIVA'] = 0
-        if not 'TotMntTotal' in resumenP['TotalesServicio']:
-            resumenP['TotalesServicio']['TotMntTotal'] = resumen['MntTotal']
+            resumenP['MntExento'] += resumen['MntExe']
+        elif not 'MntExento' in resumenP:
+            resumenP['MntExento'] = 0
+        if not 'MntTotal' in resumenP:
+            resumenP['MntTotal'] = resumen['MntTotal']
         else:
-            resumenP['TotalesServicio']['TotMntTotal'] += resumen['MntTotal']
+            resumenP['MntTotal'] += resumen['MntTotal']
+        if 'FoliosEmitidos' in resumenP:
+            resumenP['FoliosEmitidos'] +=1
+        else:
+            resumenP['FoliosEmitidos'] = 1
+
+        if not 'FoliosAnulados' in resumenP:
+            resumenP['FoliosAnulados'] = 0
+        if 'Anulado' in resumen : # opción de indiar de que está anulado por panel SII no por nota
+            resumenP['FoliosAnulados'] += 1
+        elif 'FoliosUtilizados' in resumenP:
+            resumenP['FoliosUtilizados'] += 1
+        else:
+            resumenP['FoliosUtilizados'] = 1
+        if not str(resumen['TpoDoc'])+'_folios' in resumenP:
+            resumenP[str(resumen['TpoDoc'])+'_folios'] = collections.OrderedDict()
+        resumenP[str(resumen['TpoDoc'])+'_folios'] = self._rangosU(resumen, resumenP[str(resumen['TpoDoc'])+'_folios'])
+        
         return resumenP
 
     @api.multi
-    def do_dte_send_book(self):
+    def do_dte_send_consumo_folios(self):
         dicttoxml.set_debug(False)
         cant_doc_batch = 0
         company_id = self.company_id
@@ -937,66 +711,52 @@ version="1.0">
         signature.'''))
         certp = signature_d['cert'].replace(
             BC, '').replace(EC, '').replace('\n', '')
-        resumenes = []
-        resumenesPeriodo = {}
-        for rec in self.with_context(lang='es_CL').move_ids:
+        resumenes = {}
+        FchInicio = FchFinal = ''
+        #@TODO ordenar documentos
+        TpoDocs = []
+        recs = sorted(self.with_context(lang='es_CL').move_ids.items(), key=lambda t: t.sii_document_number)
+        for rec in recs:
+            if FchInicio == '':
+                FchInicio = rec.date
+            if rec.date != FchFinal:
+                FchFinal = rec.date
             rec.sended = True
-            if self.tipo_operacion == 'BOLETA':
-                resumen = self.getResumenBoleta(rec)
-            else:
-                resumen = self.getResumen(rec)
-            resumenes.extend([{'Detalle':resumen}])
-            TpoDoc= resumen['TpoDoc']
-            if not TpoDoc in resumenesPeriodo:
-                resumenesPeriodo[TpoDoc] = {}
-            if self.tipo_operacion == 'BOLETA':
-                resumenesPeriodo[TpoDoc] = self._setResumenPeriodoBoleta(resumen, resumenesPeriodo[TpoDoc])
-                del(resumen['MntNeto'])
-                del(resumen['MntIVA'])
-                del(resumen['TasaIVA'])
-            else:
-                resumenesPeriodo[TpoDoc] = self._setResumenPeriodo(resumen, resumenesPeriodo[TpoDoc])
-        lista = ['TpoDoc', 'TpoImp', 'TotDoc', 'TotAnulado', 'TotMntExe', 'TotMntNeto', 'TotalesServicio', 'TotOpIVARec',
-                'TotMntIVA', 'TotMntIVA', 'TotOpActivoFijo', 'TotMntIVAActivoFijo', 'itemNoRec', 'TotOpIVAUsoComun',
-                'TotIVAUsoComun', 'FctProp', 'TotCredIVAUsoComun', 'itemOtrosImp', 'TotImpSinCredito', 'TotIVARetTotal',
-                  'TotIVARetParcial', 'TotMntTotal', 'TotIVANoRetenido',
-                 'TotTabPuros', 'TotTabCigarrillos', 'TotTabElaborado', 'TotImpVehiculo',]
-        ResumenPeriodo=[]
-        for r, value in resumenesPeriodo.iteritems():
-            total = collections.OrderedDict()
-            for v in lista:
-                if v in value:
-                    total[v] = value[v]
-            ResumenPeriodo.extend([{'TotalesPeriodo':total}])
-        dte = collections.OrderedDict()
-        dte['ResumenPeriodo'] = ResumenPeriodo
-        dte['item'] = resumenes
-        dte['TmstFirma'] = self.time_stamp()
-
+            resumen = self.getResumen(rec)
+            TpoDoc = resumen['TpoDoc']
+            TpoDocs.append(TpoDoc)
+            if not TpoDoc in resumenes:
+                resumenes[TpoDoc] = collections.OrderedDict()
+            resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc])
+        Resumen=[]
+        for r, value in resumenes.iteritems():
+            Resumen.extend([ {'Resumen':value}])
+        dte = collections.OrderedDict({'item':Resumen})
         resol_data = self.get_resolution_data(company_id)
         RUTEmisor = self.format_vat(company_id.vat)
         RUTRecep = "60803000-K" # RUT SII
         xml = dicttoxml.dicttoxml(
             dte, root=False, attr_type=False)
-        doc_id =  self.tipo_operacion+'_'+self.periodo_tributario
-        libro = self.create_template_envio( RUTEmisor, self.periodo_tributario,
+        doc_id =  'CF_'+self.date
+        Correlativo = self.correlativo
+        SecEnvio = self.sec_envio
+        cf = self.create_template_envio( RUTEmisor,
             resol_data['dte_resolution_date'],
             resol_data['dte_resolution_number'],
-            xml, signature_d,self.tipo_operacion,self.tipo_libro,self.tipo_envio,self.folio_notificacion, doc_id)
-        xml  = self.create_template_env(libro)
-        env = 'libro'
-        if self.tipo_operacion in['BOLETA']:
-                xml  = self.create_template_env_boleta(libro)
-                env = 'libro_boleta'
+            FchInicio, FchFinal, Correlativo, SecEnvio,
+            xml, signature_d, doc_id)
+        xml  = self.create_template_env(cf)
         root = etree.XML( xml )
         xml_pret = etree.tostring(root, pretty_print=True)\
                 .replace('<item>','\n').replace('</item>','')\
                 .replace('<itemNoRec>','').replace('</itemNoRec>','\n')\
                 .replace('<itemOtrosImp>','').replace('</itemOtrosImp>','\n')
+        for TpoDoc in TpoDocs:
+        	xml_pret = xml_pret.replace('<'+str(TpoDoc)+'_folios>','').replace('</'+str(TpoDoc)+'_folios>','\n')
         envio_dte = self.convert_encoding(xml_pret, 'ISO-8859-1')
         envio_dte = self.sign_full_xml(
             envio_dte, signature_d['priv_key'], certp,
-            doc_id, env)
+            doc_id, 'consu')
         result = self.send_xml_file(envio_dte, doc_id+'.xml', company_id)
         self.write({
             'sii_xml_response':result['sii_xml_response'],
@@ -1012,6 +772,7 @@ version="1.0">
         respuesta = _server.getEstUp(self.company_id.vat[2:-1],self.company_id.vat[-1],track_id,token)
         self.sii_message = respuesta
         resp = xmltodict.parse(respuesta)
+        _logger.info(respuesta)
         status = False
         if resp['SII:RESPUESTA']['SII:RESP_HDR']['ESTADO'] == "-11":
             status =  {'warning':{'title':_('Error -11'), 'message': _("Error -11: Espere a que sea aceptado por el SII, intente en 5s más")}}
@@ -1035,6 +796,7 @@ version="1.0">
                 date, str(self.amount_total),token)
         self.sii_message = respuesta
         resp = xmltodict.parse(respuesta)
+        _logger.info(resp)
         if resp['SII:RESPUESTA']['SII:RESP_HDR']['ESTADO'] == '2':
             status = {'warning':{'title':_("Error code: 2"), 'message': _(resp['SII:RESPUESTA']['SII:RESP_HDR']['GLOSA'])}}
             return status

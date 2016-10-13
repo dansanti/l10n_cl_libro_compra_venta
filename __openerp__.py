@@ -25,9 +25,10 @@
     'test': [],
     'data': [
         'views/libro_compra_venta.xml',
+        'views/consumo_folios.xml',
         'views/export.xml',
         'wizard/build_and_send_moves.xml',
         'security/ir.model.access.csv',
         ],
-    'version': '9.0.2.0',
+    'version': '9.0.3.0',
 }
