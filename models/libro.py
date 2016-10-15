@@ -705,7 +705,7 @@ version="1.0">
                     det['IVANoRec']['MntIVANoRec'] = int(round(TaxMnt))
                 if rec.iva_uso_comun:
                     det['IVAUsoComun'] = int(round(TaxMnt))
-            elif tasa.sii_code not in [0,14]:#niva
+            if tasa.sii_code not in [0,14]:#niva
                 det['OtrosImp'] = collections.OrderedDict()
                 det['OtrosImp']['CodImp'] = tasa.sii_code
                 det['OtrosImp']['TasaImp'] = tasa.amount
@@ -713,9 +713,11 @@ version="1.0">
         if tasa and tasa.sii_type in ['R']:
             if tasa.retencion == tasa.amount:
                 det['IVARetTotal'] = int(round(TaxMnt))
+                TaxMnt = 0
             else:
                 det['IVARetParcial'] = int(round(Neto * (tasa.retencion / 100)))
                 det['IVANoRetenido'] = int(round(TaxMnt - (Neto * (tasa.retencion / 100))))
+                TaxMnt = det['IVANoRetenido']
         monto_total = int(round((Neto + MntExe + TaxMnt), 0))
         if no_product :
             monto_total = 0
