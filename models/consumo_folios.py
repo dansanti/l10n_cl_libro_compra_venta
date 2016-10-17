@@ -518,7 +518,7 @@ version="1.0">
         file_name = self.name.replace(' ','_')
         return {
             'type' : 'ir.actions.act_url',
-            'url': '/web/binary/download_document?model=account.move.book\
+            'url': '/web/binary/download_document?model=account.move.consumo_folios\
 &field=sii_xml_request&id=%s&filename=%s.xml' % (self.id, file_name),
             'target': 'self',
         }
@@ -600,55 +600,50 @@ version="1.0">
         return det
 
     def _nuevo_rango(self, folio, f_contrario, contrarios):
-    	last = last(contrarios)
-    	if last['Inicial'] > f_contrario:
-    		return True
-		return False
-
+        last = last(contrarios)
+        if last['Inicial'] > f_contrario:
+            return True
+        return False
 
     def _orden(self, folio, rangos, contrarios):
-    	last = last(rangos)
-		if self._nuevo_rango(folio, last['Final'], contrarios):
-			r = collections.OrderedDict()
-			r['Inicial'] = folio
-			r['Final'] = folio
-			rangos.append(r)
-			return rangos
+        last = last(rangos)
+        if self._nuevo_rango(folio, last['Final'], contrarios):
+            r = collections.OrderedDict()
+            r['Inicial'] = folio
+            r['Final'] = folio
+            rangos.append(r)
+            return rangos
+        result =[]
+        for r in rangos:
+            if r['Final'] == last['Final']:
+                r['Final'] = folio
+                result.append(r)
+        return result
 
-		result =[]
-		for r in rangos:
-			if r['Final'] == last['Final']:
-				r['Final'] = folio
-			result.append(r)
-		return result
-
-
-	def _rangosU(self, resumen, rangos):	
-		if resumen['A']:
-			if not 'RangoAnulados' in rangos:
-				rangos['RangoAnulados'] = []
-				r = collections.OrderedDict()
-				r['Inicial'] = folio
-				r['Final'] = folio
-				rangos.append(r)
-			elif not 'RangoUtilizados' in rangos:
-				rangos['RangoAnulados'][0]['Final'] = resumen['NroDoc']
-			else:
-				rangos['RangoAnulados'] = self._orden(resumen['NroDoc'], rangos['RangoAnulados'], rangos['RangoUtilizados'] )
-			return rangos
-
-		if not 'RangoUtilizados' in rangos:
-				rangos['RangoUtilizados'] = []
-				r = collections.OrderedDict()
-				r['Inicial'] = folio
-				r['Final'] = folio
-				rangos.append(r)
-		elif not 'RangoAnulados' in rangos:
-			rangos['RangoUtilizados'][0]['Final'] = resumen['NroDoc']
-		else:
-			rangos['RangoUtilizados'] = self._orden(resumen['NroDoc'], rangos['RangoUtilizados'], rangos['RangoAnulados'] )
-		return rangos
-
+    def _rangosU(self, resumen, rangos):
+        if resumen['A']:
+            if not 'RangoAnulados' in rangos:
+                rangos['RangoAnulados'] = []
+                r = collections.OrderedDict()
+                r['Inicial'] = folio
+                r['Final'] = folio
+                rangos.append(r)
+            elif not 'RangoUtilizados' in rangos:
+                rangos['RangoAnulados'][0]['Final'] = resumen['NroDoc']
+            else:
+                rangos['RangoAnulados'] = self._orden(resumen['NroDoc'], rangos['RangoAnulados'], rangos['RangoUtilizados'] )
+                return rangos
+        if not 'RangoUtilizados' in rangos:
+            rangos['RangoUtilizados'] = []
+            r = collections.OrderedDict()
+            r['Inicial'] = folio
+            r['Final'] = folio
+            rangos.append(r)
+        elif not 'RangoAnulados' in rangos:
+            rangos['RangoUtilizados'][0]['Final'] = resumen['NroDoc']
+        else:
+            rangos['RangoUtilizados'] = self._orden(resumen['NroDoc'], rangos['RangoUtilizados'], rangos['RangoAnulados'] )
+            return rangos
 
     def _setResumen(self,resumen,resumenP):
         resumenP['TipoDocumento'] = resumen['TpoDoc']
@@ -692,7 +687,7 @@ version="1.0">
         if not str(resumen['TpoDoc'])+'_folios' in resumenP:
             resumenP[str(resumen['TpoDoc'])+'_folios'] = collections.OrderedDict()
         resumenP[str(resumen['TpoDoc'])+'_folios'] = self._rangosU(resumen, resumenP[str(resumen['TpoDoc'])+'_folios'])
-        
+
         return resumenP
 
     @api.multi
