@@ -974,8 +974,9 @@ version="1.0">
                     total[v] = value[v]
             ResumenPeriodo.extend([{'TotalesPeriodo':total}])
         dte = collections.OrderedDict()
-        dte['ResumenPeriodo'] = ResumenPeriodo
-        dte['item'] = resumenes
+        if ResumenPeriodo:
+            dte['ResumenPeriodo'] = ResumenPeriodo
+            dte['item'] = resumenes
         dte['TmstFirma'] = self.time_stamp()
 
         resol_data = self.get_resolution_data(company_id)
