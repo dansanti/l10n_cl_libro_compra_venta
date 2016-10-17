@@ -115,26 +115,18 @@ connection_status = {
 class Libro(models.Model):
     _name = "account.move.book"
 
-    sii_message = fields.Text(
+   sii_message = fields.Text(
         string='SII Message',
-        copy=False,
-        readony=True,
-        states={'draft': [('readonly', False)]},)
+        copy=False)
     sii_xml_request = fields.Text(
         string='SII XML Request',
-        copy=False,
-        readony=True,
-        states={'draft': [('readonly', False)]},)
+        copy=False)
     sii_xml_response = fields.Text(
         string='SII XML Response',
-        copy=False,
-        readony=True,
-        states={'draft': [('readonly', False)]},)
+        copy=False)
     sii_send_ident = fields.Text(
         string='SII Send Identification',
-        copy=False,
-        readony=True,
-        states={'draft': [('readonly', False)]},)
+        copy=False)
     state = fields.Selection([
         ('draft', 'Borrador'),
         ('NoEnviado', 'No Enviado'),
@@ -154,8 +146,8 @@ class Libro(models.Model):
              " * The 'Paid' status is set automatically when the invoice is paid. Its related journal entries may or may not be reconciled.\n"
              " * The 'Cancelled' status is used when user cancel invoice.")
     move_ids = fields.Many2many('account.move',
-    	readony=True,
-        states={'draft': [('readonly', False)]},)
+        readonly=True,
+        states={'draft': [('readonly', False)]})
 
     tipo_libro = fields.Selection([
                 ('ESPECIAL','Especial'),
@@ -164,8 +156,8 @@ class Libro(models.Model):
                 string="Tipo de Libro",
                 default='MENSUAL',
                 required=True,
-                readony=True,
-        		states={'draft': [('readonly', False)]},
+                readonly=True,
+                states={'draft': [('readonly', False)]}
             )
     tipo_operacion = fields.Selection([
                 ('COMPRA','Compras'),
@@ -175,8 +167,8 @@ class Libro(models.Model):
                 string="Tipo de operación",
                 default="COMPRA",
                 required=True,
-                readony=True,
-        		states={'draft': [('readonly', False)]},
+                readonly=True,
+                states={'draft': [('readonly', False)]}
             )
     tipo_envio = fields.Selection([
                 ('AJUSTE','Ajuste'),
@@ -187,32 +179,43 @@ class Libro(models.Model):
                 string="Tipo de Envío",
                 default="TOTAL",
                 required=True,
-                readony=True,
-    			states={'draft': [('readonly', False)]},
+                readonly=True,
+                states={'draft': [('readonly', False)]}
             )
-    folio_notificacion = fields.Char(string="Folio de Notificación",
-    	readony=True,
-        states={'draft': [('readonly', False)]},)
+    folio_notificacion = fields.Char(
+        string="Folio de Notificación",
+        readonly=True,
+        states={'draft': [('readonly', False)]})
     #total_afecto = fields.Char(string="Total Afecto")
     #total_exento = fields.Char(string="Total Exento")
-    periodo_tributario = fields.Char('Periodo Tributario', required=True,
-    	readony=True,
-        states={'draft': [('readonly', False)]},)
-    company_id = fields.Many2one('res.company', required=True,
-    	readony=True,
-        states={'draft': [('readonly', False)]},)
-    name = fields.Char(string="Detalle" , required=True,
-    	readony=True,
-        states={'draft': [('readonly', False)]},)
-    fact_prop = fields.Float(string="Factor proporcionalidad",
-    	readony=True,
-        states={'draft': [('readonly', False)]},)
-    nro_segmento = fields.Integer(string="Número de Segmento",
-    	readony=True,
-        states={'draft': [('readonly', False)]},)
-    date = fields.Date(string="Date", required=True,
-    	readony=True,
-        states={'draft': [('readonly', False)]},)
+    periodo_tributario = fields.Char(
+        string='Periodo Tributario',
+        required=True,
+        readonly=True,
+        states={'draft': [('readonly', False)]})
+    company_id = fields.Many2one('res.company',
+        string="Compañía",
+        required=True,
+        readonly=True,
+        states={'draft': [('readonly', False)]})
+    name = fields.Char(
+        string="Detalle",
+        required=True,
+        readonly=True,
+        states={'draft': [('readonly', False)]})
+    fact_prop = fields.Float(
+        string="Factor proporcionalidad",
+        readonly=True,
+        states={'draft': [('readonly', False)]})
+    nro_segmento = fields.Integer(
+        string="Número de Segmento",
+        readonly=True,
+        states={'draft': [('readonly', False)]})
+    date = fields.Date(
+        string="Fecha",
+        required=True,
+        readonly=True,
+        states={'draft': [('readonly', False)]})
 
     def split_cert(self, cert):
         certf, j = '', 0
