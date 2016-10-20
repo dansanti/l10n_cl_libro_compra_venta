@@ -196,6 +196,7 @@ class Libro(models.Model):
     company_id = fields.Many2one('res.company',
         string="Compañía",
         required=True,
+        default=lambda self: self.env.user.company_id.id,
         readonly=True,
         states={'draft': [('readonly', False)]})
     name = fields.Char(
@@ -214,6 +215,12 @@ class Libro(models.Model):
     date = fields.Date(
         string="Fecha",
         required=True,
+        readonly=True,
+        states={'draft': [('readonly', False)]})
+
+    boletas = fields.One2many('account.move.book.boletas',
+        'book_id',
+        string="Boletas",
         readonly=True,
         states={'draft': [('readonly', False)]})
 
@@ -633,6 +640,12 @@ version="1.0">
             c += 1
         return cadena
 
+    def _TpoImp(self, tasa):
+        if tasa.sii_code in [14]:
+            return 1
+        #if tasa.sii_code in []: determinar cuando es 18.211 // zona franca
+        #    return 2
+
     def getResumen(self, rec):
         no_product = False
         if rec.document_class_id.sii_code in [56,64] or self.tipo_operacion in ['COMPRA']:
@@ -676,11 +689,8 @@ version="1.0">
                     MntExe += l.credit
                 else:
                     MntExe += l.debit
-        if tasa :
-            if tasa.sii_code in [14]:
-                det['TpoImp'] = 1
-            #elif tasa.sii_code in []: determinar cuando es 18.211 // zona franca
-            #    det['TpoImp'] = 2
+        if tasa:
+            det['TpoImp'] = self._TpoImp(tasa)
             det['TasaImp'] = round(tasa.amount,2)
         #det['IndServicio']
         #det['IndSinCosto']
@@ -730,6 +740,20 @@ version="1.0">
         if no_product :
             monto_total = 0
         det['MntTotal'] = monto_total
+        return det
+
+    def _setResumenBoletas(self, rec):
+        det = collections.OrderedDict()
+        det['TpoDoc'] = rec.tipo_boleta.sii_code
+        det['TotDoc'] = det['NroDoc'] = rec.cantidad_boletas
+        if rec.impuesto.amount > 0:
+            det['TpoImp'] = self._TpoImp(rec.impuesto)
+            det['TasaImp'] = round(rec.impuesto.amount,2)
+            det['MntNeto'] = int(round(rec.neto))
+            det['MntIVA'] = int(round(rec.monto_impuesto))
+        else:
+            det['MntExe'] = int(round(rec.neto))
+        det['MntTotal'] = int(round(rec.monto_total))
         return det
 
     def getResumenBoleta(self, rec):
@@ -784,7 +808,9 @@ version="1.0">
         if 'TpoImp' in resumen:
             resumenP['TpoImp'] = resumen['TpoImp'] or 1
         if not 'TotDoc' in resumenP:
-            resumenP['TotDoc'] = 1
+            resumenP['TotDoc'] =  1
+            if 'TotDoc' in resumen:
+                resumenP['TotDoc'] = resumen['TotDoc']
         else:
             resumenP['TotDoc'] += 1
         if 'TotAnulado' in resumenP and 'Anulado' in resumen:
@@ -966,6 +992,15 @@ version="1.0">
                 del(resumen['TasaIVA'])
             else:
                 resumenesPeriodo[TpoDoc] = self._setResumenPeriodo(resumen, resumenesPeriodo[TpoDoc])
+        if self.boletas:#no es el libro de boletas especial
+            for boletas in self.boletas:
+                resumenesPeriodo[boletas.tipo_boleta.id] = {}
+                resumen = self._setResumenBoletas(boletas)
+                del(resumen['TotDoc'])
+                resumenesPeriodo[boletas.tipo_boleta.id] = self._setResumenPeriodo(resumen, resumenesPeriodo[boletas.tipo_boleta.id])
+                #resumenes.extend([{'Detalle':resumen}])
+
+
         lista = ['TpoDoc', 'TpoImp', 'TotDoc', 'TotAnulado', 'TotMntExe', 'TotMntNeto', 'TotalesServicio', 'TotOpIVARec',
                 'TotMntIVA', 'TotMntIVA', 'TotOpActivoFijo', 'TotMntIVAActivoFijo', 'itemNoRec', 'TotOpIVAUsoComun',
                 'TotIVAUsoComun', 'FctProp', 'TotCredIVAUsoComun', 'itemOtrosImp', 'TotImpSinCredito', 'TotIVARetTotal',
@@ -1001,6 +1036,7 @@ version="1.0">
                 env = 'libro_boleta'
         root = etree.XML( xml )
         xml_pret = etree.tostring(root, pretty_print=True)\
+                .replace('<item/>','\n')\
                 .replace('<item>','\n').replace('</item>','')\
                 .replace('<itemNoRec>','').replace('</itemNoRec>','\n')\
                 .replace('<itemOtrosImp>','').replace('</itemOtrosImp>','\n')
@@ -1076,3 +1112,56 @@ version="1.0">
             status = self._get_send_status(self.sii_send_ident, signature_d, token)
             if self.state != 'Proceso':
                 return status
+
+class Boletas(models.Model):
+    _name = 'account.move.book.boletas'
+
+    currency_id = fields.Many2one('res.currency',
+        string='Moneda',
+        default=lambda self: self.env.user.company_id.currency_id,
+        required=True,
+        track_visibility='always')
+    tipo_boleta = fields.Many2one('sii.document_class',
+        string="Tipo de Boleta",
+        required=True,
+        domain=[('document_letter_id.name','in',['B','M'])])
+    rango_inicial = fields.Integer(
+        string="Rango Inicial",
+        required=True)
+    rango_final = fields.Integer(
+        string="Rango Final",
+        required=True)
+    cantidad_boletas = fields.Integer(
+        string="Cantidad Boletas",
+        rqquired=True)
+    neto = fields.Monetary(
+        string="Monto Neto",
+        required=True)
+    impuesto = fields.Many2one('account.tax',
+        string="Impuesto",
+        required=True,
+        domain=[('type_tax_use','!=','none'), '|', ('active', '=', False), ('active', '=', True)])
+    monto_impuesto = fields.Monetary(
+        compute='_monto_total',
+        string="Monto Impuesto",
+        required=True)
+    monto_total = fields.Monetary(
+        compute='_monto_total',
+        string="Monto Total",
+        required=True)
+    book_id = fields.Many2one('account.move.book')
+
+    @api.onchange( 'neto', 'impuesto')
+    def _monto_total(self):
+        monto_impuesto = 0
+        if self.impuesto and self.impuesto.amount > 0:
+            monto_impuesto = self. monto_impuesto = self.neto * (self.impuesto.amount / 100)
+        self.monto_total = self.neto + monto_impuesto
+
+    @api.onchange('rango_inicial', 'rango_final')
+    def get_cantidad(self):
+        if not self.rango_inicial or not self.rango_final:
+            return
+        if self.rango_final < self.rango_inicial:
+            raise UserError("¡El rango Final no puede ser menor al inicial")
+        self.cantidad_boletas = self.rango_final - self.rango_inicial +1
