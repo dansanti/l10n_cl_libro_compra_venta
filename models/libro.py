@@ -115,7 +115,7 @@ connection_status = {
 class Libro(models.Model):
     _name = "account.move.book"
 
-   sii_message = fields.Text(
+    sii_message = fields.Text(
         string='SII Message',
         copy=False)
     sii_xml_request = fields.Text(
@@ -216,6 +216,11 @@ class Libro(models.Model):
         required=True,
         readonly=True,
         states={'draft': [('readonly', False)]})
+
+    _defaults = {
+        'date' : datetime.now(),
+        'periodo_tributario': datetime.now().strftime('%Y-%m'),
+    }
 
     def split_cert(self, cert):
         certf, j = '', 0
