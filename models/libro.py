@@ -110,6 +110,9 @@ connection_status = {
 class Libro(models.Model):
     _name = "account.move.book"
 
+    sii_receipt = fields.Text(
+        string='SII Message',
+        copy=False)
     sii_message = fields.Text(
         string='SII Message',
         copy=False)
@@ -181,8 +184,18 @@ class Libro(models.Model):
         string="Folio de Notificación",
         readonly=True,
         states={'draft': [('readonly', False)]})
-    #total_afecto = fields.Char(string="Total Afecto")
-    #total_exento = fields.Char(string="Total Exento")
+    #total_afecto = fields.Monetary(
+    #    string="Total Afecto",
+    #    readonly=True,)
+    #total_exento = fields.Monetary(
+    #    string="Total Exento",
+    #    readonly=True,)
+    #total_iva = fields.Monetary(
+    #    string="Total IVA",
+    #    readonly=True,)
+    #total_otros_imp = fields.Monetary(
+    #    string="Total Otros Impuestos",
+    #    readonly=True,)
     periodo_tributario = fields.Char(
         string='Periodo Tributario',
         required=True,
@@ -625,7 +638,9 @@ version="1.0">
 
     @api.multi
     def validar_libro(self):
+        self._validar()
         return self.write({'state': 'NoEnviado'})
+
 
     def _acortar_str(self, texto, size=1):
         c = 0
@@ -636,8 +651,8 @@ version="1.0">
         return cadena
 
     def _TpoImp(self, tasa):
-        if tasa.sii_code in [14]:
-            return 1
+        #if tasa.sii_code in [14, 1]:
+        return 1
         #if tasa.sii_code in []: determinar cuando es 18.211 // zona franca
         #    return 2
 
@@ -662,9 +677,7 @@ version="1.0">
         #det['Operacion']
         #det['TotalesServicio']
         imp = {}
-        Neto = 0
-        MntExe = 0
-        TaxMnt = 0
+        TaxMnt = MntExe = MntIVA = Neto = 0
         ivas = {}
         for l in rec.line_ids:
             if l.tax_line_id:
@@ -721,7 +734,7 @@ version="1.0">
         if Neto > 0:
             det['MntNeto'] = int(round(Neto))
             if ivas: # Es algún tipo de iva que puede ser adicional o anticipado
-                MntIVA = det['MntIVA'] = 0
+                MntIVA = 0
                 for key, i in ivas.items():
                     if i['det'].sii_code not in [14]:
                         imp[i['det'].id] = {'imp': i['det'], 'Mnt': i['TaxMnt']}
@@ -1004,8 +1017,7 @@ version="1.0">
             resumenP['TotalesServicio']['TotMntTotal'] += resumen['MntTotal']
         return resumenP
 
-    @api.multi
-    def do_dte_send_book(self):
+    def _validar(self):
         dicttoxml.set_debug(False)
         cant_doc_batch = 0
         company_id = self.company_id
@@ -1089,6 +1101,12 @@ version="1.0">
         envio_dte = self.sign_full_xml(
             envio_dte, signature_d['priv_key'], certp,
             doc_id, env)
+        return envio_dte, doc_id
+
+    @api.multi
+    def do_dte_send_book(self):
+        envio_dte, doc_id =  self._validar()
+        company_id = self.company_id
         result = self.send_xml_file(envio_dte, doc_id+'.xml', company_id)
         self.write({
             'sii_xml_response':result['sii_xml_response'],
@@ -1102,7 +1120,7 @@ version="1.0">
         ns = 'urn:'+ server_url[self.company_id.dte_service_provider] + 'QueryEstUp.jws'
         _server = SOAPProxy(url, ns)
         respuesta = _server.getEstUp(self.company_id.vat[2:-1],self.company_id.vat[-1],track_id,token)
-        self.sii_message = respuesta
+        self.sii_receipt = respuesta
         resp = xmltodict.parse(respuesta)
         status = False
         if resp['SII:RESPUESTA']['SII:RESP_HDR']['ESTADO'] == "-11":
