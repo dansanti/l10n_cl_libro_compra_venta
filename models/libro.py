@@ -716,8 +716,8 @@ version="1.0">
         #det['IndServicio']
         #det['IndSinCosto']
         det['FchDoc'] = rec.date
-        if 1==2:#@TODO Sucursales
-            det['CdgSIISucur'] = False
+        if rec.journal_id.sii_code:
+            det['CdgSIISucur'] = rec.journal_id.sii_code
         det['RUTDoc'] = self.format_vat(rec.partner_id.vat)
         det['RznSoc'] = rec.partner_id.name[:50]
         if referencia:
