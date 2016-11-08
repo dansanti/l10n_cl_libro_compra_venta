@@ -658,12 +658,18 @@ version="1.0">
 
     def getResumen(self, rec):
         no_product = False
-        if rec.document_class_id.sii_code in [56,64] or self.tipo_operacion in ['COMPRA']:
+        if rec.document_class_id.sii_code in [56, 64] or self.tipo_operacion in ['COMPRA']:
             ob = self.env['account.invoice']
             ref = ob.search([('number','=',rec.document_number)])
-            referencia = self.env['account.move'].search([('document_number','=',ref.origin)])
+            referencia = self.env['account.move'].search([
+                            ('document_number','=',ref.origin),
+                            ('company_id','=', ref.company_id.id),
+                            ])
         else:
-            referencia = self.env['account.invoice'].search([('number','=',rec.document_number)])
+            referencia = self.env['account.invoice'].search([
+                            ('number','=',rec.document_number),
+                            ('company_id','=', ref.company_id.id),
+                            ])
         det = collections.OrderedDict()
         det['TpoDoc'] = rec.document_class_id.sii_code
         #det['Emisor']
