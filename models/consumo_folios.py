@@ -606,7 +606,7 @@ version="1.0">
         return False
 
     def _orden(self, folio, rangos, contrarios):
-        last = last(rangos)
+        last = self.last(rangos)
         if self._nuevo_rango(folio, last['Final'], contrarios):
             r = collections.OrderedDict()
             r['Inicial'] = folio
@@ -687,7 +687,6 @@ version="1.0">
         if not str(resumen['TpoDoc'])+'_folios' in resumenP:
             resumenP[str(resumen['TpoDoc'])+'_folios'] = collections.OrderedDict()
         resumenP[str(resumen['TpoDoc'])+'_folios'] = self._rangosU(resumen, resumenP[str(resumen['TpoDoc'])+'_folios'])
-
         return resumenP
 
     @api.multi
