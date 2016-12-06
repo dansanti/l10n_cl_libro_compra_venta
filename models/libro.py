@@ -670,10 +670,13 @@ version="1.0">
         no_product = False
         if rec.document_class_id.sii_code in [56, 64] or self.tipo_operacion in ['COMPRA']:
             ob = self.env['account.invoice']
-            ref = ob.search([('number','=',rec.document_number)])
+            ref = ob.search([('number','=',rec.document_number),
+                              ('partner_id','=', rec.partner_id.id)
+                            ])
             referencia = self.env['account.move'].search([
                             ('document_number','=',ref.origin),
                             ('company_id','=', ref.company_id.id),
+                            ('partner_id','=', ref.partner_id.id),
                             ])
         else:
             referencia = self.env['account.invoice'].search([
