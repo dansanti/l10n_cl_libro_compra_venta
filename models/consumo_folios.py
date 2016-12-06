@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 from openerp import fields, models, api, _
 from openerp.exceptions import UserError
 from datetime import datetime, timedelta
@@ -165,7 +164,9 @@ class ConsumoFolios(models.Model):
         states={'draft': [('readonly', False)]},)
     #total_afecto = fields.Char(string="Total Afecto")
     #total_exento = fields.Char(string="Total Exento")
-    company_id = fields.Many2one('res.company', required=True,
+    company_id = fields.Many2one('res.company',
+        required=True,
+        default=lambda self: self.env.user.company_id.id,
     	readony=True,
         states={'draft': [('readonly', False)]},)
     name = fields.Char(string="Detalle" , required=True,
@@ -553,6 +554,7 @@ version="1.0">
 
     @api.multi
     def validar_consumo_folios(self):
+        self._validar()
         return self.write({'state': 'NoEnviado'})
 
     def _acortar_str(self, texto, size=1):
@@ -621,13 +623,16 @@ version="1.0">
         return result
 
     def _rangosU(self, resumen, rangos):
-        if resumen['A']:
+        if not rangos:
+            rangos = collections.OrderedDict()
+        folio = resumen['NroDoc']
+        if 'A' in resumen:
             if not 'RangoAnulados' in rangos:
                 rangos['RangoAnulados'] = []
                 r = collections.OrderedDict()
                 r['Inicial'] = folio
                 r['Final'] = folio
-                rangos.append(r)
+                rangos['RangoAnulados'].append(r)
             elif not 'RangoUtilizados' in rangos:
                 rangos['RangoAnulados'][0]['Final'] = resumen['NroDoc']
             else:
@@ -638,12 +643,12 @@ version="1.0">
             r = collections.OrderedDict()
             r['Inicial'] = folio
             r['Final'] = folio
-            rangos.append(r)
+            rangos['RangoUtilizados'].append(r)
         elif not 'RangoAnulados' in rangos:
             rangos['RangoUtilizados'][0]['Final'] = resumen['NroDoc']
         else:
             rangos['RangoUtilizados'] = self._orden(resumen['NroDoc'], rangos['RangoUtilizados'], rangos['RangoAnulados'] )
-            return rangos
+        return rangos
 
     def _setResumen(self,resumen,resumenP):
         resumenP['TipoDocumento'] = resumen['TpoDoc']
@@ -689,8 +694,7 @@ version="1.0">
         resumenP[str(resumen['TpoDoc'])+'_folios'] = self._rangosU(resumen, resumenP[str(resumen['TpoDoc'])+'_folios'])
         return resumenP
 
-    @api.multi
-    def do_dte_send_consumo_folios(self):
+    def _validar(self):
         dicttoxml.set_debug(False)
         cant_doc_batch = 0
         company_id = self.company_id
@@ -709,7 +713,7 @@ version="1.0">
         FchInicio = FchFinal = ''
         #@TODO ordenar documentos
         TpoDocs = []
-        recs = sorted(self.with_context(lang='es_CL').move_ids.items(), key=lambda t: t.sii_document_number)
+        recs = sorted(self.with_context(lang='es_CL').move_ids, key=lambda t: t.sii_document_number)
         for rec in recs:
             if FchInicio == '':
                 FchInicio = rec.date
@@ -746,11 +750,19 @@ version="1.0">
                 .replace('<itemNoRec>','').replace('</itemNoRec>','\n')\
                 .replace('<itemOtrosImp>','').replace('</itemOtrosImp>','\n')
         for TpoDoc in TpoDocs:
-        	xml_pret = xml_pret.replace('<'+str(TpoDoc)+'_folios>','').replace('</'+str(TpoDoc)+'_folios>','\n')
+        	xml_pret = xml_pret.replace('<key name="'+str(TpoDoc)+'_folios">','').replace('</key>','\n').replace('<key name="'+str(TpoDoc)+'_folios"/>','\n')
         envio_dte = self.convert_encoding(xml_pret, 'ISO-8859-1')
         envio_dte = self.sign_full_xml(
             envio_dte, signature_d['priv_key'], certp,
             doc_id, 'consu')
+        return envio_dte, doc_id
+
+    @api.multi
+    def do_dte_send_consumo_folios(self):
+        if self.state not in ['NoEnviado', 'Rechazado']:
+            raise UserError("El Libro  ya ha sido enviado")
+        envio_dte, doc_id =  self._validar()
+        company_id = self.company_id
         result = self.send_xml_file(envio_dte, doc_id+'.xml', company_id)
         self.write({
             'sii_xml_response':result['sii_xml_response'],
