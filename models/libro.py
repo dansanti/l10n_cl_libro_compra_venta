@@ -47,6 +47,7 @@ except ImportError:
 
 try:
     import dicttoxml
+    dicttoxml.set_debug(False)
 except ImportError:
     _logger.info('Cannot import dicttoxml library')
 
@@ -499,13 +500,17 @@ version="1.0">
         return fulldoc
 
     def get_digital_signature_pem(self, comp_id):
-        obj = self.env['res.users'].browse([self.env.user.id])
+        obj = user = False
+        if 'responsable_envio' in self and self._ids:
+            obj = user = self[0].responsable_envio
+        if not obj:
+            obj = user = self.env.user
         if not obj.cert:
-            obj = self.env['res.company'].browse([comp_id.id])
-            if not obj.cert:
-                obj = self.env['res.users'].search(domain=[("authorized_users_ids","=", self.env.user.id)])
-            if not obj.cert or not self.env.user.id in obj.authorized_users_ids.ids:
-                return False
+            obj = self.env['res.users'].search([("authorized_users_ids","=", user.id)])
+            if not obj or not obj.cert:
+                obj = self.env['res.company'].browse([comp_id.id])
+                if not obj.cert or not user.id in obj.authorized_users_ids.ids:
+                    return False
         signature_data = {
             'subject_name': obj.name,
             'subject_serial_number': obj.subject_serial_number,
@@ -516,13 +521,18 @@ version="1.0">
         return signature_data
 
     def get_digital_signature(self, comp_id):
-        obj = self.env['res.users'].browse([self.env.user.id])
+        obj = user = False
+        if 'responsable_envio' in self and self._ids:
+            obj = user = self[0].responsable_envio
+        if not obj:
+            obj = user = self.env.user
+        _logger.info(obj.name)
         if not obj.cert:
-            obj = self.env['res.company'].browse([comp_id.id])
-            if not obj.cert:
-                obj = self.env['res.users'].search(domain=[("authorized_users_ids","=", self.env.user.id)])
-            if not obj.cert or not self.env.user.id in obj.authorized_users_ids.ids:
-                return False
+            obj = self.env['res.users'].search([("authorized_users_ids","=", user.id)])
+            if not obj or not obj.cert:
+                obj = self.env['res.company'].browse([comp_id.id])
+                if not obj.cert or not user.id in obj.authorized_users_ids.ids:
+                    return False
         signature_data = {
             'subject_name': obj.name,
             'subject_serial_number': obj.subject_serial_number,
@@ -590,7 +600,7 @@ version="1.0">
         respuesta_dict = xmltodict.parse(response.data)
         if respuesta_dict['RECEPCIONDTE']['STATUS'] != '0':
             _logger.info('l736-status no es 0')
-            _logger.info(connection_status[respuesta_dict['RECEPCIONDTE']['STATUS']])
+            _logger.info(connection_status)
         else:
             retorno.update({'sii_result': 'Enviado','sii_send_ident':respuesta_dict['RECEPCIONDTE']['TRACKID']})
         return retorno
@@ -668,7 +678,7 @@ version="1.0">
         else:
             referencia = self.env['account.invoice'].search([
                             ('number','=',rec.document_number),
-                            ('company_id','=', ref.company_id.id),
+                            ('company_id','=', rec.company_id.id),
                             ])
         det = collections.OrderedDict()
         det['TpoDoc'] = rec.document_class_id.sii_code
