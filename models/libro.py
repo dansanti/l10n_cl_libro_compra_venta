@@ -1124,6 +1124,8 @@ version="1.0">
 
     @api.multi
     def do_dte_send_book(self):
+        if self.state not in ['NoEnviado', 'Rechazado']:
+            raise UserError("El Libro  ya ha sido enviado")
         envio_dte, doc_id =  self._validar()
         company_id = self.company_id
         result = self.send_xml_file(envio_dte, doc_id+'.xml', company_id)
