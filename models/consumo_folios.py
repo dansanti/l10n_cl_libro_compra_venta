@@ -176,6 +176,13 @@ class ConsumoFolios(models.Model):
     	readony=True,
         states={'draft': [('readonly', False)]},)
 
+    @api.multi
+    def unlink(self):
+        for libro in self:
+            if libro.state not in ('draft', 'cancel'):
+                raise UserError(_('You cannot delete a Validated book.'))
+        return super(ConsumoFolios, self).unlink()
+
     def split_cert(self, cert):
         certf, j = '', 0
         for i in range(0, 29):
