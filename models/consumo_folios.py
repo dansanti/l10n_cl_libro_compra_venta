@@ -208,7 +208,7 @@ class ConsumoFolios(models.Model):
 {9}
 </DocumentoConsumoFolios>
 '''.format(RutEmisor, signature_d['subject_serial_number'],
-           FchResol, NroResol, FchInicio, FchFinal, Correlativo, SecEnvio, self.time_stamp(), EnvioDTE,  IdEnvio)
+           FchResol, NroResol, FchInicio, FchFinal, str(Correlativo), str(SecEnvio), self.time_stamp(), EnvioDTE,  IdEnvio)
         return xml
 
     def time_stamp(self, formato='%Y-%m-%dT%H:%M:%S'):
