@@ -814,6 +814,23 @@ version="1.0">
         det['MntTotal'] = int(round(rec.monto_total))
         return det
 
+    def _process_imps(self, tax_line_id, totales=0, currency=None, Neto=0, TaxMnt=0, MntExe=0, ivas={}, imp={}):
+        mnt = tax_line_id.compute_all(totales,  currency, 1)['taxes'][0]
+        if mnt['amount'] < 0:
+            mnt['amount'] *= -1
+            mnt['base'] *= -1
+        if tax_line_id.sii_code in [14, 15, 17, 18, 19, 30,31, 32 ,33, 34, 36, 37, 38, 39, 41, 47, 48]: # diferentes tipos de IVA retenidos o no
+            ivas.setdefault(tax_line_id.id, [ tax_line_id, 0])
+            ivas[tax_line_id.id][1] += mnt['amount']
+            TaxMnt += mnt['amount']
+            Neto += mnt['base']
+        else:
+            imp.setdefault(tax_line_id.id, [tax_line_id, 0])
+            imp[tax_line_id.id][1] += mnt['amount']
+            if tax_line_id.amount == 0:
+                MntExe += mnt['base']
+        return Neto, TaxMnt, MntExe, ivas, imp
+
     def getResumenBoleta(self, rec):
         det = collections.OrderedDict()
         det['TpoDoc'] = rec.document_class_id.sii_code
@@ -821,8 +838,12 @@ version="1.0">
         if self.env['account.invoice.referencias'].search([('origen','=',det['FolioDoc']), ('sii_referencia_TpoDocRef','=', rec.document_class_id.id), ('sii_referencia_CodRef','=','1')]):
             det['Anulado'] = 'A'
         det['TpoServ'] = 3
-        det['FchEmiDoc'] = rec.date
-        det['FchVencDoc'] = rec.date
+        try:
+            det['FchEmiDoc'] = rec.date
+            det['FchVencDoc'] = rec.date
+        except:
+            det['FchEmiDoc'] = rec.date_order[:10]
+            det['FchVencDoc'] = rec.date_order[:10]
         #det['PeriodoDesde']
         #det['PeriodoHasta']
         #det['CdgSIISucur']
@@ -830,28 +851,52 @@ version="1.0">
         MntExe = 0
         TaxMnt = 0
         tasa = False
-        for l in rec.line_ids:
-            if l.tax_line_id:
-                if l.tax_line_id and l.tax_line_id.amount > 0: #supuesto iva único
-                    tasa = l.tax_line_id
+        ivas = imp = impuestos = {}
+        if 'lines' in rec:
+            for line in rec.lines:
+                if line.tax_ids:
+                    for t in line.tax_ids:
+                        impuestos.setdefault(t.id, [t, 0])
+                        impuestos[t.id][1] += line.price_subtotal_incl
+            for key, t in impuestos.iteritems():
+                Neto, TaxMnt, MntExe, ivas, imp = self._process_imps(t[0], t[1], rec.pricelist_id.currency_id, Neto, TaxMnt, MntExe, ivas, imp)
+        else:  # si la boleta fue hecha por contabilidad
+            for l in rec.line_ids:
+                if l.tax_line_id:
+                    if l.tax_line_id and l.tax_line_id.amount > 0: #supuesto iva único
+                        if l.tax_line_id.sii_code in [14, 15, 17, 18, 19, 30,31, 32 ,33, 34, 36, 37, 38, 39, 41, 47, 48]: # diferentes tipos de IVA retenidos o no
+                            if not l.tax_line_id.id in ivas:
+                                ivas[l.tax_line_id.id] = [l.tax_line_id, 0]
+                            if l.credit > 0:
+                                ivas[l.tax_line_id.id][1] += l.credit
+                            else:
+                                ivas[l.tax_line_id.id][1] += l.debit
+                        else:
+                            if not l.tax_line_id.id in imp:
+                                imp[l.tax_line_id.id] = [l.tax_line_id, 0]
+                            if l.credit > 0:
+                                imp[l.tax_line_id.id][1] += l.credit
+                                TaxMnt += l.credit
+                            else:
+                                imp[l.tax_line_id.id][1] += l.debit
+                                TaxMnt += l.debit
+                elif l.tax_ids and l.tax_ids[0].amount > 0:
                     if l.credit > 0:
-                        TaxMnt += l.credit
+                        Neto += l.credit
                     else:
-                        TaxMnt += l.debit
-            elif l.tax_ids and l.tax_ids.amount > 0:
-                if l.credit > 0:
-                    Neto += l.credit
-                else:
-                    Neto += l.debit
-            elif l.tax_ids and l.tax_ids.amount == 0: #caso monto exento
-                if l.credit > 0:
-                    MntExe += l.credit
-                else:
-                    MntExe += l.debit
+                        Neto += l.debit
+                elif l.tax_ids and l.tax_ids[0].amount == 0: #caso monto exento
+                    if l.credit > 0:
+                        MntExe += l.credit
+                    else:
+                        MntExe += l.debit
         #det['IndServicio']
         #det['IndSinCosto']
         det['RUTCliente'] = self.format_vat(rec.partner_id.vat)
-        det['TasaIVA'] = tasa.amount
+        if TaxMnt > 0:
+            det['MntIVA'] = int(round(TaxMnt))
+            for key, t in ivas.iteritems():
+                det['TasaIVA'] = t[0].amount
         #det['CodIntCLi']
         if MntExe > 0 :
             det['MntExe'] = int(round(MntExe,0))
@@ -1062,20 +1107,38 @@ version="1.0">
         resumenesPeriodo = {}
         for rec in self.with_context(lang='es_CL').move_ids:
             rec.sended = True
-            if self.tipo_operacion == 'BOLETA':
-                resumen = self.getResumenBoleta(rec)
+            if self.tipo_operacion == 'BOLETA' and rec.document_class_id not in [False, 0] and rec.sii_document_number in [False, 0]:
+                if not rec.sii_document_number:
+                    orders = sorted(self.env['pos.order'].search(
+                            [('account_move', '=', rec.id),
+                             ('invoice_id' , '=', False),
+                             ('sii_document_number', 'not in', [False, '0']),
+                             ('document_class_id.sii_code', 'in', [39, 41]),
+                            ]).with_context(lang='es_CL'), key=lambda r: r.sii_document_number)
+                    for order in orders:
+                        TpoDoc = order.document_class_id.sii_code
+                        if not TpoDoc in resumenesPeriodo:
+                            resumenesPeriodo[TpoDoc] = {}
+                        resumen = self.getResumenBoleta(order)
+                        resumenesPeriodo[TpoDoc] = self._setResumenPeriodoBoleta(resumen, resumenesPeriodo[TpoDoc])
+                        del(resumen['MntNeto'])
+                        del(resumen['MntIVA'])
+                        del(resumen['TasaIVA'])
+                        resumenes.extend([{'Detalle':resumen}])
+                else:
+                    TpoDoc = rec.document_class_id.sii_code
+                    resumen = self.getResumenBoleta(rec)
+                    if not TpoDoc in resumenesPeriodo:
+                        resumenesPeriodo[TpoDoc] = {}
+                    resumenesPeriodo[TpoDoc] = self._setResumenPeriodoBoleta(resumen, resumenesPeriodo[TpoDoc])
+                    del(resumen['MntNeto'])
+                    del(resumen['MntIVA'])
+                    del(resumen['TasaIVA'])
             else:
                 resumen = self.getResumen(rec)
-            resumenes.extend([{'Detalle':resumen}])
-            TpoDoc= resumen['TpoDoc']
-            if not TpoDoc in resumenesPeriodo:
-                resumenesPeriodo[TpoDoc] = {}
-            if self.tipo_operacion == 'BOLETA':
-                resumenesPeriodo[TpoDoc] = self._setResumenPeriodoBoleta(resumen, resumenesPeriodo[TpoDoc])
-                del(resumen['MntNeto'])
-                del(resumen['MntIVA'])
-                del(resumen['TasaIVA'])
-            else:
+                resumenes.extend([{'Detalle':resumen}])
+                TpoDoc= resumen['TpoDoc']
+            if self.tipo_operacion != 'BOLETA':
                 resumenesPeriodo[TpoDoc] = self._setResumenPeriodo(resumen, resumenesPeriodo[TpoDoc])
         if self.boletas:#no es el libro de boletas especial
             for boletas in self.boletas:
