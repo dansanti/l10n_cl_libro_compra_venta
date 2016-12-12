@@ -577,16 +577,16 @@ version="1.0">
         if mnt['amount'] < 0:
             mnt['amount'] *= -1
             mnt['base'] *= -1
-        Neto += mnt['base']
         if tax_line_id.sii_code in [14, 15, 17, 18, 19, 30,31, 32 ,33, 34, 36, 37, 38, 39, 41, 47, 48]: # diferentes tipos de IVA retenidos o no
             ivas.setdefault(tax_line_id.id, [ tax_line_id, 0])
             ivas[tax_line_id.id][1] += mnt['amount']
             TaxMnt += mnt['amount']
+            Neto += mnt['base']
         else:
             imp.setdefault(tax_line_id.id, [tax_line_id, 0])
             imp[tax_line_id.id][1] += mnt['amount']
             if tax_line_id.amount == 0:
-                MntExe += mnt['amount']
+                MntExe += mnt['base']
         return Neto, TaxMnt, MntExe, ivas, imp
 
     def getResumen(self, rec):
