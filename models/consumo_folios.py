@@ -572,37 +572,77 @@ version="1.0">
             c += 1
         return cadena
 
+    def _process_imps(self, tax_line_id, totales=0, currency=None, Neto=0, TaxMnt=0, MntExe=0, ivas={}, imp={}):
+        mnt = tax_line_id.compute_all(totales,  currency, 1)['taxes'][0]
+        if mnt['amount'] < 0:
+            mnt['amount'] *= -1
+            mnt['base'] *= -1
+        Neto += mnt['base']
+        if tax_line_id.sii_code in [14, 15, 17, 18, 19, 30,31, 32 ,33, 34, 36, 37, 38, 39, 41, 47, 48]: # diferentes tipos de IVA retenidos o no
+            ivas.setdefault(tax_line_id.id, [ tax_line_id, 0])
+            ivas[tax_line_id.id][1] += mnt['amount']
+            TaxMnt += mnt['amount']
+        else:
+            imp.setdefault(tax_line_id.id, [tax_line_id, 0])
+            imp[tax_line_id.id][1] += mnt['amount']
+            if tax_line_id.amount == 0:
+                MntExe += mnt['amount']
+        return Neto, TaxMnt, MntExe, ivas, imp
+
     def getResumen(self, rec):
         det = collections.OrderedDict()
+
         det['TpoDoc'] = rec.document_class_id.sii_code
         det['NroDoc'] = int(rec.sii_document_number)
         Neto = 0
         MntExe = 0
         TaxMnt = 0
         tasa = False
-        for l in rec.line_ids:
-            if l.tax_line_id:
-                if l.tax_line_id and l.tax_line_id.amount > 0: #supuesto iva único
-                    tasa = l.tax_line_id
+        ivas = imp = impuestos = {}
+        if 'lines' in rec:
+            for line in rec.lines:
+                if line.tax_ids:
+                    for t in line.tax_ids:
+                        impuestos.setdefault(t.id, [t, 0])
+                        impuestos[t.id][1] += line.price_subtotal_incl
+            for key, t in impuestos.iteritems():
+                Neto, TaxMnt, MntExe, ivas, imp = self._process_imps(t[0], t[1], rec.pricelist_id.currency_id, Neto, TaxMnt, MntExe, ivas, imp)
+        else:  # si la boleta fue hecha por contabilidad
+            for l in rec.line_ids:
+                if l.tax_line_id:
+                    if l.tax_line_id and l.tax_line_id.amount > 0: #supuesto iva único
+                        if l.tax_line_id.sii_code in [14, 15, 17, 18, 19, 30,31, 32 ,33, 34, 36, 37, 38, 39, 41, 47, 48]: # diferentes tipos de IVA retenidos o no
+                            if not l.tax_line_id.id in ivas:
+                                ivas[l.tax_line_id.id] = [l.tax_line_id, 0]
+                            if l.credit > 0:
+                                ivas[l.tax_line_id.id][1] += l.credit
+                            else:
+                                ivas[l.tax_line_id.id][1] += l.debit
+                        else:
+                            if not l.tax_line_id.id in imp:
+                                imp[l.tax_line_id.id] = [l.tax_line_id, 0]
+                            if l.credit > 0:
+                                imp[l.tax_line_id.id][1] += l.credit
+                                TaxMnt += l.credit
+                            else:
+                                imp[l.tax_line_id.id][1] += l.debit
+                                TaxMnt += l.debit
+                elif l.tax_ids and l.tax_ids[0].amount > 0:
                     if l.credit > 0:
-                        TaxMnt += l.credit
+                        Neto += l.credit
                     else:
-                        TaxMnt += l.debit
-            elif l.tax_ids and l.tax_ids.amount > 0:
-                if l.credit > 0:
-                    Neto += l.credit
-                else:
-                    Neto += l.debit
-            elif l.tax_ids and l.tax_ids.amount == 0: #caso monto exento
-                if l.credit > 0:
-                    MntExe += l.credit
-                else:
-                    MntExe += l.debit
+                        Neto += l.debit
+                elif l.tax_ids and l.tax_ids[0].amount == 0: #caso monto exento
+                    if l.credit > 0:
+                        MntExe += l.credit
+                    else:
+                        MntExe += l.debit
         if MntExe > 0 :
             det['MntExe'] = int(round(MntExe,0))
         if TaxMnt > 0:
             det['MntIVA'] = int(round(TaxMnt))
-            det['TasaIVA'] = tasa.amount
+            for key, t in ivas.iteritems():
+                det['TasaIVA'] = t[0].amount
         monto_total = int(round((Neto + MntExe + TaxMnt), 0))
         det['MntNeto'] = int(round(Neto))
         det['MntTotal'] = monto_total
@@ -722,17 +762,34 @@ version="1.0">
         TpoDocs = []
         recs = sorted(self.with_context(lang='es_CL').move_ids, key=lambda t: t.sii_document_number)
         for rec in recs:
+            if not rec.document_class_id or rec.document_class_id.sii_code not in [39, 41, 61]:
+                raise UserError("Por este medio solamente e pueden declarar Boletas o Notas de crédito Electrónicas, por favor elimine el documento %s del listado" % rec.name)
             if FchInicio == '':
                 FchInicio = rec.date
             if rec.date != FchFinal:
                 FchFinal = rec.date
             rec.sended = True
-            resumen = self.getResumen(rec)
-            TpoDoc = resumen['TpoDoc']
-            TpoDocs.append(TpoDoc)
-            if not TpoDoc in resumenes:
-                resumenes[TpoDoc] = collections.OrderedDict()
-            resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc])
+            if not rec.sii_document_number:
+                orders = sorted(self.env['pos.order'].search(
+                        [('account_move', '=', rec.id),
+                         ('invoice_id' , '=', False),
+                         ('sii_document_number', 'not in', [False, '0']),
+                         ('document_class_id', '!=', False),
+                        ]).with_context(lang='es_CL'), key=lambda r: r.sii_document_number)
+                for order in orders:
+                    resumen = self.getResumen(order)
+                    TpoDoc = resumen['TpoDoc']
+                    TpoDocs.append(TpoDoc)
+                    if not TpoDoc in resumenes:
+                        resumenes[TpoDoc] = collections.OrderedDict()
+                    resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc])
+            else:
+                resumen = self.getResumen(rec)
+                TpoDoc = resumen['TpoDoc']
+                TpoDocs.append(TpoDoc)
+                if not TpoDoc in resumenes:
+                    resumenes[TpoDoc] = collections.OrderedDict()
+                resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc])
         Resumen=[]
         for r, value in resumenes.iteritems():
             Resumen.extend([ {'Resumen':value}])
@@ -762,6 +819,9 @@ version="1.0">
         envio_dte = self.sign_full_xml(
             envio_dte, signature_d['priv_key'], certp,
             doc_id, 'consu')
+        doc_id += '.xml'
+        self.sii_xml_request = envio_dte
+        #self.send_file_name = doc_id
         return envio_dte, doc_id
 
     @api.multi
@@ -770,7 +830,7 @@ version="1.0">
             raise UserError("El Libro  ya ha sido enviado")
         envio_dte, doc_id =  self._validar()
         company_id = self.company_id
-        result = self.send_xml_file(envio_dte, doc_id+'.xml', company_id)
+        result = self.send_xml_file(envio_dte, doc_id, company_id)
         self.write({
             'sii_xml_response':result['sii_xml_response'],
             'sii_send_ident':result['sii_send_ident'],
