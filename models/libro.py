@@ -1107,6 +1107,9 @@ version="1.0">
         resumenesPeriodo = {}
         for rec in self.with_context(lang='es_CL').move_ids:
             rec.sended = True
+            TpoDoc = rec.document_class_id.sii_code
+            if not TpoDoc in resumenesPeriodo:
+                resumenesPeriodo[TpoDoc] = {}
             if self.tipo_operacion == 'BOLETA' and rec.document_class_id not in [False, 0] and rec.sii_document_number in [False, 0]:
                 if not rec.sii_document_number:
                     orders = sorted(self.env['pos.order'].search(
@@ -1126,10 +1129,7 @@ version="1.0">
                         del(resumen['TasaIVA'])
                         resumenes.extend([{'Detalle':resumen}])
                 else:
-                    TpoDoc = rec.document_class_id.sii_code
                     resumen = self.getResumenBoleta(rec)
-                    if not TpoDoc in resumenesPeriodo:
-                        resumenesPeriodo[TpoDoc] = {}
                     resumenesPeriodo[TpoDoc] = self._setResumenPeriodoBoleta(resumen, resumenesPeriodo[TpoDoc])
                     del(resumen['MntNeto'])
                     del(resumen['MntIVA'])
