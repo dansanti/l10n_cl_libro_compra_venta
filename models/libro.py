@@ -1137,7 +1137,6 @@ version="1.0">
             else:
                 resumen = self.getResumen(rec)
                 resumenes.extend([{'Detalle':resumen}])
-                TpoDoc= resumen['TpoDoc']
             if self.tipo_operacion != 'BOLETA':
                 resumenesPeriodo[TpoDoc] = self._setResumenPeriodo(resumen, resumenesPeriodo[TpoDoc])
         if self.boletas:#no es el libro de boletas especial
