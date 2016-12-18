@@ -48,6 +48,7 @@
                   <field name="tipo_libro" />
                   <field name="tipo_envio" />
                   <field name="folio_notificacion" attrs="{'invisible':[('tipo_libro','not in',['ESPECIAL'])],'required':[('tipo_libro','in',['ESPECIAL'])]}" />
+                  <field name="codigo_rectificacion" attrs="{'invisible':[('tipo_libro','not in',['RECTIFICA'])],'required':[('tipo_libro','in',['RECTIFICA'])]}" />
                   <field name="fact_prop" />
                 </group>
                 <notebook>
@@ -86,7 +87,7 @@
                       <field name='sii_receipt' attrs="{'invisible':[('state', 'in', ['','NoEnviado'])]}" readonly="1"/>
                       <field name='sii_send_ident' attrs="{'invisible':[('state', 'in', ['','NoEnviado'])]}" readonly="1"/>
                       <field name='sii_xml_response' attrs="{'invisible':[('state', 'in', ['','NoEnviado'])]}" readonly="1"/>
-                      <field name='sii_xml_request' attrs="{'invisible':[('state', 'in', ['','NoEnviado'])]}" readonly="1"/>
+                      <field name='sii_xml_request' readonly="1"/>
                     </group>
                   </page>
                 </notebook>

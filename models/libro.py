@@ -151,6 +151,7 @@ class Libro(models.Model):
     tipo_libro = fields.Selection([
                 ('ESPECIAL','Especial'),
                 ('MENSUAL','Mensual'),
+                ('RECTIFICA', 'Rectifica'),
                 ],
                 string="Tipo de Libro",
                 default='MENSUAL',
@@ -226,12 +227,12 @@ class Libro(models.Model):
         required=True,
         readonly=True,
         states={'draft': [('readonly', False)]})
-
     boletas = fields.One2many('account.move.book.boletas',
         'book_id',
         string="Boletas",
         readonly=True,
         states={'draft': [('readonly', False)]})
+    codigo_rectificacion = fields.Char(string="Código de Rectificación")
 
     _defaults = {
         'date' : datetime.now(),
@@ -252,17 +253,18 @@ class Libro(models.Model):
         return certf
 
     def create_template_envio(self, RutEmisor, PeriodoTributario, FchResol, NroResol, EnvioDTE,signature_d,TipoOperacion='VENTA',TipoLibro='MENSUAL',TipoEnvio='TOTAL',FolioNotificacion="123", IdEnvio='SetDoc'):
-        if TipoOperacion == 'BOLETA' and TipoLibro != 'ESPECIAL':
+        if TipoOperacion == 'BOLETA' and TipoLibro not in ['ESPECIAL', 'RECTIFICA']:
             raise UserError("Boletas debe ser solamente Tipo Operación ESPECIAL")
+        CodigoRectificacion = FolioNotificacion = ''
         if TipoLibro in ['ESPECIAL'] or TipoOperacion in ['BOLETA']:
-            FolioNotificacion = '<FolioNotificacion>{0}</FolioNotificacion>'.format(FolioNotificacion)
-        else:
-            FolioNotificacion = ''
+            FolioNotificacion = '\n<FolioNotificacion>{0}</FolioNotificacion>'.format(FolioNotificacion)
+        if TipoLibro == 'RECTIFICA':
+            CodigoRectificacion = '\n<CodAutRec>' + self.codigo_rectificacion + '</CodAutRec>'
 
         if TipoOperacion in ['BOLETA']:
             TipoOperacion = ''
         else:
-            TipoOperacion = '<TipoOperacion>'+TipoOperacion+'</TipoOperacion>'
+            TipoOperacion = '\n<TipoOperacion>'+TipoOperacion+'</TipoOperacion>'
         xml = '''<EnvioLibro ID="{10}">
 <Caratula>
 <RutEmisorLibro>{0}</RutEmisorLibro>
@@ -271,13 +273,23 @@ class Libro(models.Model):
 <FchResol>{3}</FchResol>
 <NroResol>{4}</NroResol>{5}
 <TipoLibro>{6}</TipoLibro>
-<TipoEnvio>{7}</TipoEnvio>
-{8}
+<TipoEnvio>{7}</TipoEnvio>{8}{11}
 </Caratula>
 {9}
 </EnvioLibro>
-'''.format(RutEmisor, signature_d['subject_serial_number'], PeriodoTributario,
-           FchResol, NroResol,TipoOperacion, TipoLibro,TipoEnvio,FolioNotificacion, EnvioDTE,IdEnvio)
+'''.format(RutEmisor,
+           signature_d['subject_serial_number'],
+           PeriodoTributario,
+           FchResol,
+           NroResol,
+           TipoOperacion,
+           TipoLibro,
+           TipoEnvio,
+           FolioNotificacion,
+           EnvioDTE,
+           IdEnvio,
+           CodigoRectificacion,
+       )
         return xml
 
     def time_stamp(self, formato='%Y-%m-%dT%H:%M:%S'):
@@ -1189,6 +1201,7 @@ version="1.0">
         envio_dte = self.sign_full_xml(
             envio_dte, signature_d['priv_key'], certp,
             doc_id, env)
+        self.sii_xml_request = envio_dte
         return envio_dte, doc_id
 
     @api.multi
