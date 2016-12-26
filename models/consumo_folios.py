@@ -648,14 +648,20 @@ version="1.0">
         det['MntTotal'] = monto_total
         return det
 
+    def _last(self, folio, items):# se aasumen que vienen ordenados de menor a mayor
+        for c in items:
+            if folio > c['Final'] and folio > c['Inicial']:
+                return c
+        return False
+
     def _nuevo_rango(self, folio, f_contrario, contrarios):
-        last = last(contrarios)
-        if last['Inicial'] > f_contrario:
+        last = self._last(folio, contrarios)#obtengo el último tramo de los contrarios
+        if last and last['Inicial'] > f_contrario:
             return True
         return False
 
     def _orden(self, folio, rangos, contrarios):
-        last = self.last(rangos)
+        last = self._last(folio, rangos)
         if self._nuevo_rango(folio, last['Final'], contrarios):
             r = collections.OrderedDict()
             r['Inicial'] = folio
