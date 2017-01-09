@@ -849,19 +849,19 @@ version="1.0">
         det = collections.OrderedDict()
         det['TpoDoc'] = rec.document_class_id.sii_code
         det['FolioDoc'] = int(rec.sii_document_number)
-        if self.env['account.invoice.referencias'].search(
-                [('origen', '=', det['FolioDoc']),
-                 ('sii_referencia_TpoDocRef', '=', rec.document_class_id.id),
-                 ('sii_referencia_CodRef', '=', '1')
-                ]) or  \
-            (rec.document_class_id.sii_code in [39, 41] and
-             self.env['pos.order.referencias'].search([
-                 ('origen', '=', det['FolioDoc']),
-                 ('sii_referencia_TpoDocRef', '=', rec.document_class_id.id),
-                 ('sii_referencia_CodRef', '=', '1')
-                ])
-            ):
-            det['Anulado'] = 'A'
+        #if self.env['account.invoice.referencias'].search(
+        #        [('origen', '=', det['FolioDoc']),
+        #         ('sii_referencia_TpoDocRef', '=', rec.document_class_id.id),
+        #         ('sii_referencia_CodRef', '=', '1')
+        #        ]) or  \
+        #    (rec.document_class_id.sii_code in [39, 41] and
+        #     self.env['pos.order.referencias'].search([
+        #         ('origen', '=', det['FolioDoc']),
+        #         ('sii_referencia_TpoDocRef', '=', rec.document_class_id.id),
+        #         ('sii_referencia_CodRef', '=', '1')
+        #        ])
+        #    ):
+        #    det['Anulado'] = 'A'
         det['TpoServ'] = 3
         try:
             det['FchEmiDoc'] = rec.date
