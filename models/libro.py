@@ -937,17 +937,20 @@ version="1.0">
             tots = []
             for o in resumen['itemOtrosImp']:
                 tot = {}
-                tot['TotOtrosImp'] = collections.OrderedDict()
                 cod = o['OtrosImp']['CodImp'].replace('_no_rec','')
-                tot['TotOtrosImp']['CodImp']  = cod
-                tot['TotOtrosImp']['TotMntImp']  = o['OtrosImp']['MntImp']
-                #tot['FctImpAdic']
                 if cod == o['OtrosImp']['CodImp']:
+                    tot['TotOtrosImp'] = collections.OrderedDict()
+                    tot['TotOtrosImp']['CodImp']  = cod
+                    tot['TotOtrosImp']['TotMntImp']  = o['OtrosImp']['MntImp']
+                    #tot['FctImpAdic']
                     tot['TotOtrosImp']['TotCredImp']  = o['OtrosImp']['MntImp']
+                    tots.append(tot)
                 else:
                     no_rec += o['OtrosImp']['MntImp']
-                tots.append(tot)
-            resumenP['itemOtrosImp'] = tots
+            if tots:
+                resumenP['itemOtrosImp'] = tots
+            if no_rec > 0:
+                resumenP['TotImpSinCredito'] = no_rec
             return resumenP
         seted = False
         itemOtrosImp = []
@@ -960,21 +963,22 @@ version="1.0">
                         o['TotOtrosImp']['TotCredImp'] = r['OtrosImp']['MntImp']
                     elif cod == r['OtrosImp']['CodImp']:
                         o['TotOtrosImp']['TotCredImp'] += r['OtrosImp']['MntImp']
-                    else:
-                        no_rec += o['OtrosImp']['MntImp']
                     seted = True
                     itemOtrosImp.append(o)
-            if not seted:
-                tot = {}
-                tot['TotOtrosImp'] = collections.OrderedDict()
-                tot['TotOtrosImp']['CodImp']  = cod
-                tot['TotOtrosImp']['TotMntImp']  = r['OtrosImp']['MntImp']
-                #tot['FctImpAdic']
-                if cod == o['OtrosImp']['CodImp']:
-                    tot['TotOtrosImp']['TotCredImp'] += o['OtrosImp']['MntImp']
                 else:
                     no_rec += o['OtrosImp']['MntImp']
-                itemOtrosImp.append(tot)
+            if not seted:
+                if cod == o['OtrosImp']['CodImp']:
+                    tot = {}
+                    tot['TotOtrosImp'] = collections.OrderedDict()
+                    tot['TotOtrosImp']['CodImp']  = cod
+                    tot['TotOtrosImp']['TotMntImp']  = r['OtrosImp']['MntImp']
+                    #tot['FctImpAdic']
+                    tot['TotOtrosImp']['TotCredImp'] += o['OtrosImp']['MntImp']
+                    itemOtrosImp.append(tot)
+                else:
+                    no_rec += o['OtrosImp']['MntImp']
+
         resumenP['itemOtrosImp'] = itemOtrosImp
         if not 'TotImpSinCredito' in resumenP and no_rec > 0:
             resumenP['TotImpSinCredito'] += no_rec
