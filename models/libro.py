@@ -717,18 +717,26 @@ version="1.0">
         #det['Operacion']
         #det['TotalesServicio']
         imp = {}
-        TaxMnt = MntExe = MntIVA = Neto = 0
+        TaxMnt = 0
+        MntExe = 0
+        MntIVA = 0
+        Neto = 0
+        ActivoFijo = [0,0]
         ivas = {}
         for l in rec.line_ids:
             if l.tax_line_id:
-                if l.tax_line_id and l.tax_line_id.amount > 0: #supuesto iva único
+                if l.tax_line_id and l.tax_line_id.amount > 0:
                     if l.tax_line_id.sii_code in [14, 15, 17, 18, 19, 30,31, 32 ,33, 34, 36, 37, 38, 39, 41, 47, 48]: # diferentes tipos de IVA retenidos o no
                         if not l.tax_line_id.id in ivas:
                             ivas[l.tax_line_id.id] = {'det': l.tax_line_id, 'TaxMnt': 0}
                         if l.credit > 0:
                             ivas[l.tax_line_id.id]['TaxMnt'] += l.credit
+                            if l.tax_line_id.activo_fijo:
+                                ActivoFijo[1] += l.credit
                         else:
                             ivas[l.tax_line_id.id]['TaxMnt'] += l.debit
+                            if l.tax_line_id.activo_fijo:
+                                ActivoFijo[1] += l.debit
                     else:
                         if not l.tax_line_id.id in imp:
                             imp[l.tax_line_id.id] = {'imp':l.tax_line_id, 'Mnt':0}
@@ -741,8 +749,12 @@ version="1.0">
             elif l.tax_ids and l.tax_ids[0].amount > 0:
                 if l.credit > 0:
                     Neto += l.credit
+                    if l.tax_ids[0].activo_fijo:
+                        ActivoFijo[0] += l.credit
                 else:
                     Neto += l.debit
+                    if l.tax_ids[0].activo_fijo:
+                        ActivoFijo[0] += l.debit
             elif l.tax_ids and l.tax_ids[0].amount == 0: #caso monto exento
                 if l.credit > 0:
                     MntExe += l.credit
@@ -781,6 +793,9 @@ version="1.0">
                     MntIVA += int(round(i['TaxMnt']))
                 if not rec.no_rec_code and not rec.iva_uso_comun:
                     det['MntIVA'] = MntIVA
+                if ActivoFijo != [0,0]:
+                    det['MntActivoFijo'] = Activofijo[0]
+                    det['MntIVAActivoFijo'] = Activofijo[1]
                 if rec.no_rec_code:
                     det['IVANoRec'] = collections.OrderedDict()
                     det['IVANoRec']['CodIVANoRec'] = rec.no_rec_code
@@ -876,7 +891,9 @@ version="1.0">
         MntExe = 0
         TaxMnt = 0
         tasa = False
-        ivas = imp = impuestos = {}
+        ivas = {}
+        imp = {}
+        impuestos = {}
         if 'lines' in rec:
             for line in rec.lines:
                 if line.tax_ids:
@@ -1022,8 +1039,12 @@ version="1.0">
             resumenP['TotMntIVA'] += resumen['MntIVA']
         elif not 'TotMntIVA' in resumenP:
             resumenP['TotMntIVA'] = 0
-        #resumenP['TotOpActivoFijo'] = resumen['TotOpActivoFijo']
-        #resumenP['TotMntIVAActivoFijo'] = resumen['TotMntIVAActivoFijo']
+        if 'MntActivoFijo' in resumen and not 'TotOpActivoFijo'in resumenP:
+            resumenP['TotOpActivoFijo'] = resumen['MntActivoFijo']
+            resumenP['TotMntIVAActivoFijo'] = resumen['MntIVAActivoFijo']
+        elif 'MntActivoFijo' in resumen:
+            resumenP['TotOpActivoFijo'] += resumen['MntActivoFijo']
+            resumenP['TotMntIVAActivoFijo'] += resumen['MntIVAActivoFijo']
         if 'IVANoRec' in resumen and not 'itemNoRec' in resumenP:
             tot = {}
             tot['TotIVANoRec'] = collections.OrderedDict()
