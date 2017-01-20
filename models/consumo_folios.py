@@ -648,7 +648,7 @@ version="1.0">
         det['MntTotal'] = monto_total
         return det
 
-    def _last(self, folio, items):# se aasumen que vienen ordenados de menor a mayor
+    def _last(self, folio, items):# se asumen que vienen ordenados de menor a mayor
         for c in items:
             if folio > c['Final'] and folio > c['Inicial']:
                 return c
@@ -668,11 +668,11 @@ version="1.0">
             r['Final'] = folio
             rangos.append(r)
             return rangos
-        result =[]
+        result = []
         for r in rangos:
-            if r['Final'] == last['Final']:
+            if r['Final'] == last['Final'] and folio > last['Final']:
                 r['Final'] = folio
-                result.append(r)
+            result.append(r)
         return result
 
     def _rangosU(self, resumen, rangos):
@@ -680,27 +680,25 @@ version="1.0">
             rangos = collections.OrderedDict()
         folio = resumen['NroDoc']
         if 'A' in resumen:
+            utilizados = rangos['RangoUtilizados'] if 'RangoUtilizados' in rangos else []
             if not 'RangoAnulados' in rangos:
                 rangos['RangoAnulados'] = []
                 r = collections.OrderedDict()
                 r['Inicial'] = folio
                 r['Final'] = folio
                 rangos['RangoAnulados'].append(r)
-            elif not 'RangoUtilizados' in rangos:
-                rangos['RangoAnulados'][0]['Final'] = resumen['NroDoc']
             else:
-                rangos['RangoAnulados'] = self._orden(resumen['NroDoc'], rangos['RangoAnulados'], rangos['RangoUtilizados'] )
+                rangos['RangoAnulados'] = self._orden(resumen['NroDoc'], rangos['RangoAnulados'], utilizados )
                 return rangos
+        anulados = rangos['RangoAnulados'] if 'RangoAnulados' in rangos else []
         if not 'RangoUtilizados' in rangos:
             rangos['RangoUtilizados'] = []
             r = collections.OrderedDict()
             r['Inicial'] = folio
             r['Final'] = folio
             rangos['RangoUtilizados'].append(r)
-        elif not 'RangoAnulados' in rangos:
-            rangos['RangoUtilizados'][0]['Final'] = resumen['NroDoc']
         else:
-            rangos['RangoUtilizados'] = self._orden(resumen['NroDoc'], rangos['RangoUtilizados'], rangos['RangoAnulados'] )
+            rangos['RangoUtilizados'] = self._orden(resumen['NroDoc'], rangos['RangoUtilizados'], anulados )
         return rangos
 
     def _setResumen(self,resumen,resumenP):
