@@ -762,7 +762,6 @@ version="1.0">
             BC, '').replace(EC, '').replace('\n', '')
         resumenes = {}
         FchInicio = FchFinal = ''
-        #@TODO ordenar documentos
         TpoDocs = []
         recs = sorted(self.with_context(lang='es_CL').move_ids, key=lambda t: t.sii_document_number)
         for rec in recs:
@@ -780,7 +779,7 @@ version="1.0">
                         [('account_move', '=', rec.id),
                          ('invoice_id' , '=', False),
                          ('sii_document_number', 'not in', [False, '0']),
-                         ('document_class_id', '!=', False),
+                         ('document_class_id', 'in', [39, 41, 61]),
                         ]).with_context(lang='es_CL'), key=lambda r: r.sii_document_number)
                 for order in orders:
                     resumen = self.getResumen(order)
