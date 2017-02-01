@@ -766,8 +766,10 @@ version="1.0">
         TpoDocs = []
         recs = sorted(self.with_context(lang='es_CL').move_ids, key=lambda t: t.sii_document_number)
         for rec in recs:
-            if not rec.document_class_id or rec.document_class_id.sii_code not in [39, 41, 61]:
-                raise UserError("Por este medio solamente e pueden declarar Boletas o Notas de crédito Electrónicas, por favor elimine el documento %s del listado" % rec.name)
+            document_class_id = rec.document_class_id if 'document_class_id' in rec else rec.sii_document_class_id
+            if not document_class_id or document_class_id.sii_code not in [39, 41, 61]:
+                _logger.info("Por este medio solamente e pueden declarar Boletas o Notas de crédito Electrónicas, por favor elimine el documento %s del listado" % rec.name)
+                continue
             if FchInicio == '':
                 FchInicio = rec.date
             if rec.date != FchFinal:
