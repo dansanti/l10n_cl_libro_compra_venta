@@ -176,6 +176,28 @@ class ConsumoFolios(models.Model):
     	readony=True,
         states={'draft': [('readonly', False)]},)
 
+    _defaults = {
+        'date' : datetime.now(),
+        'fecha_inicio': datetime.now().strftime('%Y-%m-%d'),
+        'fecha_final': datetime.now().strftime('%Y-%m-%d')
+    }
+
+    @api.onchange('fecha_inicio')
+    def set_data(self):
+        self.name = self.fecha_inicio
+        self.fecha_final = self.fecha_inicio
+        self.move_ids = self.env['account.move'].search([
+            ('document_class_id.sii_code', 'in', [39, 41]),
+            ('sended','=', False),
+            ('date', '=', self.fecha_inicio),
+            ]).ids
+        consumos = self.search_count([
+            ('fecha_inicio', '=', self.fecha_inicio),
+            ('state', 'not in', ['draft', 'Rechazado']),
+            ])
+        if consumos > 0:
+            self.correlativo = (consumos+1)
+
     @api.multi
     def unlink(self):
         for libro in self:
