@@ -239,6 +239,20 @@ class Libro(models.Model):
         'periodo_tributario': datetime.now().strftime('%Y-%m'),
     }
 
+    @api.onchange('periodo_tributario', 'tipo_operacion')
+    def set_movimientos(self):
+        next_month = datetime.strptime( self.periodo_tributario + '-01', '%Y-%m-%d' ) + relativedelta.relativedelta(months=1)
+        query = [
+            ('sended', '=', False),
+            ('date' , '<', next_month.strftime('%Y-%m-%d')),
+            ]
+        domain = 'sale'
+        if self.tipo_operacion in ['COMPRA']:
+            two_month = datetime.strptime( self.periodo_tributario + '-01', '%Y-%m-%d' ) + relativedelta.relativedelta(months=-2)
+            query.append(('date' , '>=', two_month.strftime('%Y-%m-%d')))
+        query.append(('journal_id.type', '=', domain))
+        self.move_ids = self.env['account.move'].search(query)
+
     @api.multi
     def unlink(self):
         for libro in self:
