@@ -182,7 +182,7 @@ class ConsumoFolios(models.Model):
         'fecha_final': datetime.now().strftime('%Y-%m-%d')
     }
 
-    @api.onchange('fecha_inicio')
+    @api.onchange('fecha_inicio', 'company_id')
     def set_data(self):
         self.name = self.fecha_inicio
         self.fecha_final = self.fecha_inicio
@@ -190,10 +190,12 @@ class ConsumoFolios(models.Model):
             ('document_class_id.sii_code', 'in', [39, 41]),
             ('sended','=', False),
             ('date', '=', self.fecha_inicio),
+            ('company_id', '=', self.company_id.id),
             ]).ids
         consumos = self.search_count([
             ('fecha_inicio', '=', self.fecha_inicio),
             ('state', 'not in', ['draft', 'Rechazado']),
+            ('company_id', '=', self.company_id.id),
             ])
         if consumos > 0:
             self.correlativo = (consumos+1)

@@ -239,10 +239,11 @@ class Libro(models.Model):
         'periodo_tributario': datetime.now().strftime('%Y-%m'),
     }
 
-    @api.onchange('periodo_tributario', 'tipo_operacion')
+    @api.onchange('periodo_tributario', 'tipo_operacion', 'company_id')
     def set_movimientos(self):
         next_month = datetime.strptime( self.periodo_tributario + '-01', '%Y-%m-%d' ) + relativedelta.relativedelta(months=1)
         query = [
+            ('company_id', '=', self.company_id.id),
             ('sended', '=', False),
             ('date' , '<', next_month.strftime('%Y-%m-%d')),
             ]
