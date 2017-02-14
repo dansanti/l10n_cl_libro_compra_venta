@@ -704,21 +704,10 @@ version="1.0">
 
     def getResumen(self, rec):
         no_product = False
-        if rec.document_class_id.sii_code in [56, 64] or self.tipo_operacion in ['COMPRA']:
-            ob = self.env['account.invoice']
-            ref = ob.search([('number','=',rec.document_number),
-                              ('partner_id','=', rec.partner_id.id)
-                            ])
-            referencia = self.env['account.move'].search([
-                            ('document_number','=',ref.origin),
-                            ('company_id','=', ref.company_id.id),
-                            ('partner_id','=', ref.partner_id.id),
-                            ])
-        else:
-            referencia = self.env['account.invoice'].search([
-                            ('number','=',rec.document_number),
-                            ('company_id','=', rec.company_id.id),
-                            ])
+        ob = self.env['account.invoice']
+        inv = ob.search([
+                        ('move_id','=',rec.id),
+                        ])
         det = collections.OrderedDict()
         det['TpoDoc'] = rec.document_class_id.sii_code
         #det['Emisor']
@@ -787,13 +776,9 @@ version="1.0">
             det['CdgSIISucur'] = rec.journal_id.sii_code
         det['RUTDoc'] = self.format_vat(rec.partner_id.vat)
         det['RznSoc'] = rec.partner_id.name[:50]
-        if referencia:
-            if self.tipo_operacion in ['COMPRA']:
-                det['TpoDocRef'] = referencia.document_class_id.sii_code
-                det['FolioDocRef'] = referencia.ref
-            else:
-                det['TpoDocRef'] = referencia.journal_document_class_id.sii_code
-                det['FolioDocRef'] = referencia.origin
+        if inv.referencias and inv.referencias[0].sii_referencia_CodRef:
+            det['TpoDocRef'] = inv.referencias[0].sii_referencia_TpoDocRef.sii_code
+            det['FolioDocRef'] = inv.referencias[0].origen
         if MntExe > 0 :
             det['MntExe'] = int(round(MntExe,0))
         elif self.tipo_operacion in ['VENTA'] and not Neto > 0:
