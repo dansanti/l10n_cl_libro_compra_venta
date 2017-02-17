@@ -2,6 +2,7 @@
 from openerp import fields, models, api, _
 from openerp.exceptions import UserError
 from datetime import datetime, timedelta
+import dateutil.relativedelta as relativedelta
 import logging
 from lxml import etree
 from lxml.etree import Element, SubElement
