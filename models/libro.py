@@ -187,6 +187,9 @@ class Libro(models.Model):
         string="Folio de Notificación",
         readonly=True,
         states={'draft': [('readonly', False)]})
+    impuestos = fields.One2many('account.move.book.tax',
+        'book_id',
+        string="Detalle Impuestos")
     #total_afecto = fields.Monetary(
     #    string="Total Afecto",
     #    readonly=True,)
@@ -249,12 +252,39 @@ class Libro(models.Model):
             ('date' , '<', next_month.strftime('%Y-%m-%d')),
             ]
         domain = 'sale'
-        if self.tipo_operacion in ['COMPRA']:
+        if self.tipo_operacion in [ 'COMPRA' ]:
             two_month = datetime.strptime( self.periodo_tributario + '-01', '%Y-%m-%d' ) + relativedelta.relativedelta(months=-2)
             query.append(('date' , '>=', two_month.strftime('%Y-%m-%d')))
             domain = 'purchase'
         query.append(('journal_id.type', '=', domain))
         self.move_ids = self.env['account.move'].search(query)
+
+    @api.onchange('move_ids')
+    def compute_taxes(self):
+        imp = {}
+        for move in self.move_ids:
+            for l in move.line_ids:
+                if l.tax_line_id:
+                    if l.tax_line_id:
+                        if not l.tax_line_id.id in imp:
+                            imp[l.tax_line_id.id] = {'tax_id':l.tax_line_id.id, 'credit':0 , 'debit': 0,}
+                        imp[l.tax_line_id.id]['credit'] += l.credit
+                        imp[l.tax_line_id.id]['debit'] += l.debit
+                        if l.tax_line_id.activo_fijo:
+                            ActivoFijo[1] += l.credit
+                elif l.tax_ids and l.tax_ids[0].amount == 0: #caso monto exento
+                    if not l.tax_ids[0].id in imp:
+                        imp[l.tax_ids[0].id] = {'tax_id':l.tax_ids[0].id, 'credit':0 , 'debit': 0,}
+                    imp[l.tax_ids[0].id]['credit'] += l.credit
+                    imp[l.tax_ids[0].id]['debit'] += l.debit
+        if self.impuestos and isinstance(self.id, int):
+            self._cr.execute("DELETE FROM account_move_book_tax WHERE book_id=%s", (self.id,))
+            self.invalidate_cache()
+        lines = [[5,],]
+        for key, i in imp.items():
+            i['currency_id'] = self.env.user.company_id.currency_id.id
+            lines.append([0,0, i])
+        self.impuestos = lines
 
     @api.multi
     def unlink(self):
@@ -1371,3 +1401,23 @@ class Boletas(models.Model):
         if self.rango_final < self.rango_inicial:
             raise UserError("¡El rango Final no puede ser menor al inicial")
         self.cantidad_boletas = self.rango_final - self.rango_inicial +1
+
+class ImpuestosLibro(models.Model):
+    _name="account.move.book.tax"
+
+    def get_monto(self):
+        for t in self:
+            t.amount = t.debit - t.credit
+            if t.book_id.tipo_operacion in [ 'VENTA' ]:
+                t.amount = t.credit - t.debit
+
+    tax_id = fields.Many2one('account.tax', string="Impuesto")
+    credit = fields.Monetary(string="Créditos", default=0.00)
+    debit = fields.Monetary(string="Débitos", default=0.00)
+    amount = fields.Monetary(compute="get_monto", string="Monto")
+    currency_id = fields.Many2one('res.currency',
+        string='Moneda',
+        default=lambda self: self.env.user.company_id.currency_id,
+        required=True,
+        track_visibility='always')
+    book_id = fields.Many2one('account.move.book', string="Libro")

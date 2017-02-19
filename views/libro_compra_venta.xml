@@ -51,6 +51,18 @@
                   <field name="codigo_rectificacion" attrs="{'invisible':[('tipo_libro','not in',['RECTIFICA'])],'required':[('tipo_libro','in',['RECTIFICA'])]}" />
                   <field name="fact_prop" />
                 </group>
+                <group>
+                  <field name="impuestos" options="{'no_edit': True}" context="{'tipo_operacion': tipo_operacion}">
+                    <tree>
+                      <field name="tax_id" />
+                      <field name="debit" />
+                      <field name="credit" />
+                      <field name="amount" />
+                      <field name="currency_id" invisible="True"/>
+                      <field name="book_id" invisible="True" />
+                    </tree>
+                  </field>
+                </group>
                 <notebook>
                   <page string="Movimientos">
                     <field name="move_ids" editable="bottom" widget="many2many_list">
