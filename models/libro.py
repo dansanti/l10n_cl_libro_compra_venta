@@ -252,6 +252,7 @@ class Libro(models.Model):
         if self.tipo_operacion in ['COMPRA']:
             two_month = datetime.strptime( self.periodo_tributario + '-01', '%Y-%m-%d' ) + relativedelta.relativedelta(months=-2)
             query.append(('date' , '>=', two_month.strftime('%Y-%m-%d')))
+            domain = 'purchase'
         query.append(('journal_id.type', '=', domain))
         self.move_ids = self.env['account.move'].search(query)
 
