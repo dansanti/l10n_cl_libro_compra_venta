@@ -782,6 +782,15 @@ version="1.0">
                         else:
                             imp[l.tax_line_id.id]['Mnt'] += l.debit
                             TaxMnt += l.debit
+            elif l.tax_ids and l.tax_ids[0].no_rec:
+                if not l.tax_ids[0].id in imp:
+                    imp[l.tax_ids[0].id] = {'imp':l.tax_ids[0], 'Mnt':0}
+                if l.credit > 0:
+                    imp[l.tax_ids[0].id]['Mnt'] += l.credit
+                    TaxMnt += l.credit
+                else:
+                    imp[l.tax_ids[0].id]['Mnt'] += l.debit
+                    TaxMnt += l.debit
             elif l.tax_ids and l.tax_ids[0].amount > 0:
                 if l.credit > 0:
                     Neto += l.credit
@@ -838,10 +847,13 @@ version="1.0">
             imps = []
             for key, t in imp.items():
                 otro = {}
-                otro['OtrosImp'] = collections.OrderedDict()
-                otro['OtrosImp']['CodImp'] = str(t['imp'].sii_code) + ('_no_rec' if t['imp'].no_rec else '')
-                otro['OtrosImp']['TasaImp'] = round(t['imp'].amount,2)
-                otro['OtrosImp']['MntImp'] = int(round(t['Mnt']))
+                if t['imp'].no_rec:
+                    otro['MntSinCred'] = int(round(t['Mnt']))
+                else:
+                    otro['OtrosImp'] = collections.OrderedDict()
+                    otro['OtrosImp']['CodImp'] = t['imp'].sii_code
+                    otro['OtrosImp']['TasaImp'] = round(t['imp'].amount,2)
+                    otro['OtrosImp']['MntImp'] = int(round(t['Mnt']))
                 imps.append(otro)
             det['itemOtrosImp'] = imps
         if ivas:
@@ -986,8 +998,8 @@ version="1.0">
             tots = []
             for o in resumen['itemOtrosImp']:
                 tot = {}
-                cod = o['OtrosImp']['CodImp'].replace('_no_rec','')
-                if cod == o['OtrosImp']['CodImp']:
+                if 'MntSinCred' not in o:
+                    cod = o['OtrosImp']['CodImp']
                     tot['TotOtrosImp'] = collections.OrderedDict()
                     tot['TotOtrosImp']['CodImp']  = cod
                     tot['TotOtrosImp']['TotMntImp']  = o['OtrosImp']['MntImp']
@@ -995,7 +1007,7 @@ version="1.0">
                     tot['TotOtrosImp']['TotCredImp']  = o['OtrosImp']['MntImp']
                     tots.append(tot)
                 else:
-                    no_rec += o['OtrosImp']['MntImp']
+                    no_rec += o['MntSinCred']
             if tots:
                 resumenP['itemOtrosImp'] = tots
             if no_rec > 0:
