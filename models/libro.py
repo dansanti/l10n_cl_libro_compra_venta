@@ -250,6 +250,7 @@ class Libro(models.Model):
             ('company_id', '=', self.company_id.id),
             ('sended', '=', False),
             ('date' , '<', next_month.strftime('%Y-%m-%d')),
+            ('document_class_id.sii_code','not in', [False, 39]),
             ]
         domain = 'sale'
         if self.tipo_operacion in [ 'COMPRA' ]:
@@ -878,7 +879,7 @@ version="1.0">
         det['TpoDoc'] = rec.tipo_boleta.sii_code
         det['TotDoc'] = det['NroDoc'] = rec.cantidad_boletas
         if rec.impuesto.amount > 0:
-            det['TpoImp'] = self._TpoImp(rec.impuesto)
+            #det['TpoImp'] = self._TpoImp(rec.impuesto)
             det['TasaImp'] = round(rec.impuesto.amount,2)
             det['MntNeto'] = int(round(rec.neto))
             det['MntIVA'] = int(round(rec.monto_impuesto))
