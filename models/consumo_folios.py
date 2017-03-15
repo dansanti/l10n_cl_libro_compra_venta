@@ -803,7 +803,7 @@ version="1.0">
                         [('account_move', '=', rec.id),
                          ('invoice_id' , '=', False),
                          ('sii_document_number', 'not in', [False, '0']),
-                         ('document_class_id', 'in', [39, 41, 61]),
+                         ('document_class_id.sii_code', 'in', [39, 41, 61]),
                         ]).with_context(lang='es_CL'), key=lambda r: r.sii_document_number)
                 for order in orders:
                     resumen = self.getResumen(order)
