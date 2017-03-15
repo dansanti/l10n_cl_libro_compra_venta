@@ -684,9 +684,9 @@ version="1.0">
             return True
         return False
 
-    def _orden(self, folio, rangos, contrarios):
+    def _orden(self, folio, rangos, contrarios, continuado=True):
         last = self._last(folio, rangos)
-        if self._nuevo_rango(folio, last['Final'], contrarios):
+        if not continuado or not last or  self._nuevo_rango(folio, last['Final'], contrarios):
             r = collections.OrderedDict()
             r['Inicial'] = folio
             r['Final'] = folio
@@ -699,7 +699,7 @@ version="1.0">
             result.append(r)
         return result
 
-    def _rangosU(self, resumen, rangos):
+    def _rangosU(self, resumen, rangos, continuado=True):
         if not rangos:
             rangos = collections.OrderedDict()
         folio = resumen['NroDoc']
@@ -712,7 +712,7 @@ version="1.0">
                 r['Final'] = folio
                 rangos['RangoAnulados'].append(r)
             else:
-                rangos['RangoAnulados'] = self._orden(resumen['NroDoc'], rangos['RangoAnulados'], utilizados )
+                rangos['RangoAnulados'] = self._orden(resumen['NroDoc'], rangos['RangoAnulados'], utilizados, continuado)
                 return rangos
         anulados = rangos['RangoAnulados'] if 'RangoAnulados' in rangos else []
         if not 'RangoUtilizados' in rangos:
@@ -722,10 +722,10 @@ version="1.0">
             r['Final'] = folio
             rangos['RangoUtilizados'].append(r)
         else:
-            rangos['RangoUtilizados'] = self._orden(resumen['NroDoc'], rangos['RangoUtilizados'], anulados )
+            rangos['RangoUtilizados'] = self._orden(resumen['NroDoc'], rangos['RangoUtilizados'], anulados, continuado)
         return rangos
 
-    def _setResumen(self,resumen,resumenP):
+    def _setResumen(self,resumen,resumenP,continuado=True):
         resumenP['TipoDocumento'] = resumen['TpoDoc']
         if 'MntNeto' in resumen and not 'MntNeto' in resumenP:
             resumenP['MntNeto'] = resumen['MntNeto']
@@ -766,7 +766,7 @@ version="1.0">
             resumenP['FoliosUtilizados'] = 1
         if not str(resumen['TpoDoc'])+'_folios' in resumenP:
             resumenP[str(resumen['TpoDoc'])+'_folios'] = collections.OrderedDict()
-        resumenP[str(resumen['TpoDoc'])+'_folios'] = self._rangosU(resumen, resumenP[str(resumen['TpoDoc'])+'_folios'])
+        resumenP[str(resumen['TpoDoc'])+'_folios'] = self._rangosU(resumen, resumenP[str(resumen['TpoDoc'])+'_folios'], continuado)
         return resumenP
 
     def _validar(self):
@@ -787,6 +787,7 @@ version="1.0">
         resumenes = {}
         FchInicio = FchFinal = ''
         TpoDocs = []
+        orders = []
         recs = sorted(self.with_context(lang='es_CL').move_ids, key=lambda t: t.sii_document_number)
         for rec in recs:
             document_class_id = rec.document_class_id if 'document_class_id' in rec else rec.sii_document_class_id
@@ -799,19 +800,12 @@ version="1.0">
                 FchFinal = rec.date
             rec.sended = True
             if not rec.sii_document_number:
-                orders = sorted(self.env['pos.order'].search(
+                orders += self.env['pos.order'].search(
                         [('account_move', '=', rec.id),
                          ('invoice_id' , '=', False),
                          ('sii_document_number', 'not in', [False, '0']),
                          ('document_class_id.sii_code', 'in', [39, 41, 61]),
-                        ]).with_context(lang='es_CL'), key=lambda r: r.sii_document_number)
-                for order in orders:
-                    resumen = self.getResumen(order)
-                    TpoDoc = resumen['TpoDoc']
-                    TpoDocs.append(TpoDoc)
-                    if not TpoDoc in resumenes:
-                        resumenes[TpoDoc] = collections.OrderedDict()
-                    resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc])
+                        ]).ids
             else:
                 resumen = self.getResumen(rec)
                 TpoDoc = resumen['TpoDoc']
@@ -819,6 +813,17 @@ version="1.0">
                 if not TpoDoc in resumenes:
                     resumenes[TpoDoc] = collections.OrderedDict()
                 resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc])
+        if orders:
+            orders_array = sorted(self.env['pos.order'].browse(orders).with_context(lang='es_CL'), key=lambda t: t.sii_document_number)
+            ant = 0
+            for order in orders_array:
+                resumen = self.getResumen(order)
+                TpoDoc = resumen['TpoDoc']
+                TpoDocs.append(TpoDoc)
+                if not TpoDoc in resumenes:
+                    resumenes[TpoDoc] = collections.OrderedDict()
+                resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc],((ant+1) == order.sii_document_number))
+                ant = order.sii_document_number
         Resumen=[]
         for r, value in resumenes.iteritems():
             Resumen.extend([ {'Resumen':value}])
@@ -844,6 +849,7 @@ version="1.0">
                 .replace('<itemOtrosImp>','').replace('</itemOtrosImp>','\n')
         for TpoDoc in TpoDocs:
         	xml_pret = xml_pret.replace('<key name="'+str(TpoDoc)+'_folios">','').replace('</key>','\n').replace('<key name="'+str(TpoDoc)+'_folios"/>','\n')
+        _logger.info(xml_pret)
         envio_dte = self.convert_encoding(xml_pret, 'ISO-8859-1')
         envio_dte = self.sign_full_xml(
             envio_dte, signature_d['priv_key'], certp,
