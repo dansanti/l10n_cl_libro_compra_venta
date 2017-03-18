@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {   'active': False,
     'author': u'Daniel Santibañez Polanco, Chilean Localization Team 9.0',
-    'website': 'http://globalresponse.cl',
+    'website': 'https://globalresponse.cl',
     'category': 'Account/invoice',
     'demo_xml': [],
     'depends': [
@@ -30,5 +30,5 @@
         'wizard/build_and_send_moves.xml',
         'security/ir.model.access.csv',
         ],
-    'version': '9.0.4.6',
+    'version': '9.0.4.7',
 }

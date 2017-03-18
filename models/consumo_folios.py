@@ -704,25 +704,25 @@ version="1.0">
             rangos = collections.OrderedDict()
         folio = resumen['NroDoc']
         if 'A' in resumen:
-            utilizados = rangos['RangoUtilizados'] if 'RangoUtilizados' in rangos else []
-            if not 'RangoAnulados' in rangos:
-                rangos['RangoAnulados'] = []
+            utilizados = rangos['itemUtilizados'] if 'itemUtilizados' in rangos else []
+            if not 'itemAnulados' in rangos:
+                rangos['itemAnulados'] = []
                 r = collections.OrderedDict()
                 r['Inicial'] = folio
                 r['Final'] = folio
-                rangos['RangoAnulados'].append(r)
+                rangos['itemAnulados'].append(r)
             else:
-                rangos['RangoAnulados'] = self._orden(resumen['NroDoc'], rangos['RangoAnulados'], utilizados, continuado)
+                rangos['itemAnulados'] = self._orden(resumen['NroDoc'], rangos['itemAnulados'], utilizados, continuado)
                 return rangos
-        anulados = rangos['RangoAnulados'] if 'RangoAnulados' in rangos else []
-        if not 'RangoUtilizados' in rangos:
-            rangos['RangoUtilizados'] = []
+        anulados = rangos['itemAnulados'] if 'itemAnulados' in rangos else []
+        if not 'itemUtilizados' in rangos:
+            rangos['itemUtilizados'] = []
             r = collections.OrderedDict()
             r['Inicial'] = folio
             r['Final'] = folio
-            rangos['RangoUtilizados'].append(r)
+            rangos['itemUtilizados'].append(r)
         else:
-            rangos['RangoUtilizados'] = self._orden(resumen['NroDoc'], rangos['RangoUtilizados'], anulados, continuado)
+            rangos['itemUtilizados'] = self._orden(resumen['NroDoc'], rangos['itemUtilizados'], anulados, continuado)
         return rangos
 
     def _setResumen(self,resumen,resumenP,continuado=True):
@@ -785,7 +785,6 @@ version="1.0">
         certp = signature_d['cert'].replace(
             BC, '').replace(EC, '').replace('\n', '')
         resumenes = {}
-        FchInicio = FchFinal = ''
         TpoDocs = []
         orders = []
         recs = sorted(self.with_context(lang='es_CL').move_ids, key=lambda t: t.sii_document_number)
@@ -794,10 +793,6 @@ version="1.0">
             if not document_class_id or document_class_id.sii_code not in [39, 41, 61]:
                 _logger.info("Por este medio solamente e pueden declarar Boletas o Notas de crédito Electrónicas, por favor elimine el documento %s del listado" % rec.name)
                 continue
-            if FchInicio == '':
-                FchInicio = rec.date
-            if rec.date != FchFinal:
-                FchFinal = rec.date
             rec.sended = True
             if not rec.sii_document_number:
                 orders += self.env['pos.order'].search(
@@ -826,6 +821,20 @@ version="1.0">
                 ant = order.sii_document_number
         Resumen=[]
         for r, value in resumenes.iteritems():
+            _logger.info(value)
+            if str(r)+'_folios' in value:
+                folios = value[ str(r)+'_folios' ]
+                if 'itemUtilizados' in folios:
+                    for rango in folios['itemUtilizados']:
+                        utilizados = []
+                        utilizados.append({'RangoUtilizados': rango})
+                    folios['itemUtilizados'] = utilizados
+                if 'itemAnulados' in folios:
+                    for rango in folios['itemAnulados']:
+                        anulados = []
+                        anulados.append({'RangoAnulados': rango})
+                    folios['itemAnulados'] = anulados
+                value[ str(r)+'_folios' ] = folios
             Resumen.extend([ {'Resumen':value}])
         dte = collections.OrderedDict({'item':Resumen})
         resol_data = self.get_resolution_data(company_id)
@@ -846,7 +855,9 @@ version="1.0">
         xml_pret = etree.tostring(root, pretty_print=True)\
                 .replace('<item>','\n').replace('</item>','')\
                 .replace('<itemNoRec>','').replace('</itemNoRec>','\n')\
-                .replace('<itemOtrosImp>','').replace('</itemOtrosImp>','\n')
+                .replace('<itemOtrosImp>','').replace('</itemOtrosImp>','\n')\
+                .replace('<itemUtilizados>','').replace('</itemUtilizados>','\n')\
+                .replace('<itemAnulados>','').replace('</itemAnulados>','\n')
         for TpoDoc in TpoDocs:
         	xml_pret = xml_pret.replace('<key name="'+str(TpoDoc)+'_folios">','').replace('</key>','\n').replace('<key name="'+str(TpoDoc)+'_folios"/>','\n')
         _logger.info(xml_pret)
