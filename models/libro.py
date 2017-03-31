@@ -749,8 +749,8 @@ version="1.0">
             det['NroDoc'] = int(rec.ref)
         else:
             det['NroDoc'] = int(rec.sii_document_number)
-        #if rec.is_anulation:
-        #    det['Anulado'] = 'A'
+        if rec.canceled:
+            det['Anulado'] = 'A'
         #det['Operacion']
         #det['TotalesServicio']
         imp = {}
