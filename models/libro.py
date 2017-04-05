@@ -278,6 +278,9 @@ class Libro(models.Model):
                         imp[l.tax_ids[0].id] = {'tax_id':l.tax_ids[0].id, 'credit':0 , 'debit': 0,}
                     imp[l.tax_ids[0].id]['credit'] += l.credit
                     imp[l.tax_ids[0].id]['debit'] += l.debit
+        if self.boletas:
+            for bol in self.boletas:
+                imp[bol.impuesto.id]['debit'] += bol.monto_impuesto            
         if self.impuestos and isinstance(self.id, int):
             self._cr.execute("DELETE FROM account_move_book_tax WHERE book_id=%s", (self.id,))
             self.invalidate_cache()
