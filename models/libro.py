@@ -259,6 +259,26 @@ class Libro(models.Model):
             domain = 'purchase'
         query.append(('journal_id.type', '=', domain))
         self.move_ids = self.env['account.move'].search(query)
+        if self.tipo_operacion in [ 'VENTA' ]:
+            libro_boletas = self.env['account.move.consumo_folios'].search([
+                ('state','not in', ['draft']),
+                ('fecha_inicio','>=', datetime.strptime( self.periodo_tributario + '-01', '%Y-%m-%d' )),
+                ('fecha_inicio','<', next_month),
+            ])
+            if libro_boletas:
+                lines = [[5,],]
+                for det in libro_boletas.detalles:
+                    line = {
+                        'currency_id' : self.env.user.company_id.currency_id,
+                        'tipo_boleta' : det.tpo_doc,
+                        'cantidad_boletas' : det.cantidad ,
+                        'neto' : det.monto_neto,
+                        'impuesto' : self.env['account.tax'].search([('sii_code','=', 14), ('type_tax_use','=','sale'),('company','=',self.company_id.id)],limit=1).id,
+                        'monto_impuesto' : det.monto_iva,
+                        }
+                    lines.append([0,0, line])
+                self.detalles = lines
+
 
     @api.onchange('move_ids')
     def compute_taxes(self):
@@ -280,7 +300,7 @@ class Libro(models.Model):
                     imp[l.tax_ids[0].id]['debit'] += l.debit
         if self.boletas:
             for bol in self.boletas:
-                imp[bol.impuesto.id]['debit'] += bol.monto_impuesto            
+                imp[bol.impuesto.id]['debit'] += bol.monto_impuesto
         if self.impuestos and isinstance(self.id, int):
             self._cr.execute("DELETE FROM account_move_book_tax WHERE book_id=%s", (self.id,))
             self.invalidate_cache()
