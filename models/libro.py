@@ -1425,10 +1425,11 @@ class Boletas(models.Model):
 
     @api.onchange( 'neto', 'impuesto')
     def _monto_total(self):
-        monto_impuesto = 0
-        if self.impuesto and self.impuesto.amount > 0:
-            monto_impuesto = self. monto_impuesto = self.neto * (self.impuesto.amount / 100)
-        self.monto_total = self.neto + monto_impuesto
+        for b in self:
+            monto_impuesto = 0
+            if b.impuesto and b.impuesto.amount > 0:
+                monto_impuesto = b.monto_impuesto = b.neto * (b.impuesto.amount / 100)
+            b.monto_total = b.neto + monto_impuesto
 
     @api.onchange('rango_inicial', 'rango_final')
     def get_cantidad(self):
