@@ -190,18 +190,36 @@ class Libro(models.Model):
     impuestos = fields.One2many('account.move.book.tax',
         'book_id',
         string="Detalle Impuestos")
-    #total_afecto = fields.Monetary(
-    #    string="Total Afecto",
-    #    readonly=True,)
-    #total_exento = fields.Monetary(
-    #    string="Total Exento",
-    #    readonly=True,)
-    #total_iva = fields.Monetary(
-    #    string="Total IVA",
-    #    readonly=True,)
-    #total_otros_imp = fields.Monetary(
-    #    string="Total Otros Impuestos",
-    #    readonly=True,)
+    currency_id = fields.Many2one('res.currency',
+        string='Moneda',
+        default=lambda self: self.env.user.company_id.currency_id,
+        required=True,
+        track_visibility='always')
+    total_afecto = fields.Monetary(
+        string="Total Afecto",
+        readonly=True,
+        compute="set_resumen",
+        store=True,)
+    total_exento = fields.Monetary(
+        string="Total Exento",
+        readonly=True,
+        compute='set_resumen',
+        store=True,)
+    total_iva = fields.Monetary(
+        string="Total IVA",
+        readonly=True,
+        compute='set_resumen',
+        store=True,)
+    total_otros_imps = fields.Monetary(
+        string="Total Otros Impuestos",
+        readonly=True,
+        compute='set_resumen',
+        store=True,)
+    total = fields.Monetary(
+        string="Total Otros Impuestos",
+        readonly=True,
+        compute='set_resumen',
+        store=True,)
     periodo_tributario = fields.Char(
         string='Periodo Tributario',
         required=True,
@@ -245,24 +263,27 @@ class Libro(models.Model):
 
     @api.onchange('periodo_tributario', 'tipo_operacion', 'company_id')
     def set_movimientos(self):
-        next_month = datetime.strptime( self.periodo_tributario + '-01', '%Y-%m-%d' ) + relativedelta.relativedelta(months=1)
+        current = datetime.strptime( self.periodo_tributario + '-01', '%Y-%m-%d' )
+        next_month = current + relativedelta.relativedelta(months=1)
+        docs = [False, 70, 71]
+        operator = 'not in'
         query = [
             ('company_id', '=', self.company_id.id),
             ('sended', '=', False),
+            ('date' , '>=', current.strftime('%Y-%m-%d')),
             ('date' , '<', next_month.strftime('%Y-%m-%d')),
-            ('document_class_id.sii_code','not in', [False, 39]),
             ]
         domain = 'sale'
         if self.tipo_operacion in [ 'COMPRA' ]:
-            two_month = datetime.strptime( self.periodo_tributario + '-01', '%Y-%m-%d' ) + relativedelta.relativedelta(months=-2)
+            two_month = current + relativedelta.relativedelta(months=-2)
             query.append(('date' , '>=', two_month.strftime('%Y-%m-%d')))
             domain = 'purchase'
         query.append(('journal_id.type', '=', domain))
-        self.move_ids = self.env['account.move'].search(query)
         if self.tipo_operacion in [ 'VENTA' ]:
+            docs.extend([35, 38, 39, 41])
             libro_boletas = self.env['account.move.consumo_folios'].search([
                 ('state','not in', ['draft']),
-                ('fecha_inicio','>=', datetime.strptime( self.periodo_tributario + '-01', '%Y-%m-%d' )),
+                ('fecha_inicio','>=', current),
                 ('fecha_inicio','<', next_month),
             ])
             if libro_boletas:
@@ -275,29 +296,41 @@ class Libro(models.Model):
                         'neto' : det.monto_neto,
                         'impuesto' : self.env['account.tax'].search([('sii_code','=', 14), ('type_tax_use','=','sale'),('company','=',self.company_id.id)],limit=1).id,
                         'monto_impuesto' : det.monto_iva,
+                        'monto_exento': det.monto_exento,
                         }
                     lines.append([0,0, line])
                 self.detalles = lines
+        if self.tipo_operacion in [ 'VENTA' ]:
+            operator = 'in'
+        query.append(('document_class_id.sii_code', operator, docs))
+        self.move_ids = self.env['account.move'].search(query)
 
+
+    def _get_imps(self):
+        imp = {}
+        for move in self.move_ids:
+            move_imps = move._get_move_imps()
+            for key, i in move_imps.items():
+                if not key in imp:
+                    imp[key] = i
+                else:
+                    imp[key]['credit'] += i['credit']
+                    imp[key]['debit'] += i['debit']
+        return imp
+
+    @api.onchange('move_ids')
+    def set_resumen(self):
+        for mov in self.move_ids:
+            totales = mov.totales_por_movimiento()
+            self.total_afecto += totales['neto']
+            self.total_exento += totales['exento']
+            self.total_iva += totales['iva']
+            self.total_otros_imps += totales['otros_imps']
+            self.total += mov.amount
 
     @api.onchange('move_ids')
     def compute_taxes(self):
-        imp = {}
-        for move in self.move_ids:
-            for l in move.line_ids:
-                if l.tax_line_id:
-                    if l.tax_line_id:
-                        if not l.tax_line_id.id in imp:
-                            imp[l.tax_line_id.id] = {'tax_id':l.tax_line_id.id, 'credit':0 , 'debit': 0,}
-                        imp[l.tax_line_id.id]['credit'] += l.credit
-                        imp[l.tax_line_id.id]['debit'] += l.debit
-                        if l.tax_line_id.activo_fijo:
-                            ActivoFijo[1] += l.credit
-                elif l.tax_ids and l.tax_ids[0].amount == 0: #caso monto exento
-                    if not l.tax_ids[0].id in imp:
-                        imp[l.tax_ids[0].id] = {'tax_id':l.tax_ids[0].id, 'credit':0 , 'debit': 0,}
-                    imp[l.tax_ids[0].id]['credit'] += l.credit
-                    imp[l.tax_ids[0].id]['debit'] += l.debit
+        imp = self._get_imps()
         if self.boletas:
             for bol in self.boletas:
                 imp[bol.impuesto.id]['debit'] += bol.monto_impuesto

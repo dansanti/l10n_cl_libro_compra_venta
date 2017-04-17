@@ -31,5 +31,5 @@
         'wizard/build_and_send_moves.xml',
         'security/ir.model.access.csv',
         ],
-    'version': '9.0.4.7',
+    'version': '9.0.5.0',
 }
