@@ -43,6 +43,12 @@
                   <field name="name" />
                   <field name="date" />
                   <field name="company_id" />
+                  <field name="currency_id" invisible="True"/>
+                  <field name="total_afecto" invisible="True"/>
+                  <field name="total_iva" invisible="True"/>
+                  <field name="total_exento" invisible="True"/>
+                  <field name="total_otros_imps" invisible="True"/>
+                  <field name="total" invisible="True"/>
                   <field name="periodo_tributario" />
                   <field name="tipo_operacion"/>
                   <field name="tipo_libro" />
