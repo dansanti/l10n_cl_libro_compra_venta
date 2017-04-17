@@ -25,6 +25,7 @@
     'test': [],
     'data': [
         'views/libro_compra_venta.xml',
+        'views/libro_honorarios.xml',
         'views/consumo_folios.xml',
         'views/export.xml',
         'wizard/build_and_send_moves.xml',
