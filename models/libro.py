@@ -270,7 +270,6 @@ class Libro(models.Model):
         query = [
             ('company_id', '=', self.company_id.id),
             ('sended', '=', False),
-            ('date' , '>=', current.strftime('%Y-%m-%d')),
             ('date' , '<', next_month.strftime('%Y-%m-%d')),
             ]
         domain = 'sale'
@@ -300,6 +299,8 @@ class Libro(models.Model):
                         }
                     lines.append([0,0, line])
                 self.detalles = lines
+        if self.tipo_operacion in [ 'VENTA', 'BOLETA' ]:
+            query.append(('date' , '>=', current.strftime('%Y-%m-%d')))
         if self.tipo_operacion in [ 'BOLETA' ]:
             operator = 'in'
         query.append(('document_class_id.sii_code', operator, docs))
