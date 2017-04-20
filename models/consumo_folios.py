@@ -46,6 +46,7 @@ except ImportError:
 
 try:
     import dicttoxml
+    dicttoxml.set_debug(False)
 except ImportError:
     _logger.info('Cannot import dicttoxml library')
 
@@ -175,12 +176,68 @@ class ConsumoFolios(models.Model):
     date = fields.Date(string="Date", required=True,
     	readony=True,
         states={'draft': [('readonly', False)]},)
+    detalles = fields.One2many('account.move.consumo_folios.detalles',
+       'cf_id',
+       string="Detalle Rangos")
+    impuestos = fields.One2many('account.move.consumo_folios.impuestos',
+       'cf_id',
+       string="Detalle Impuestos")
 
     _defaults = {
         'date' : datetime.now(),
         'fecha_inicio': datetime.now().strftime('%Y-%m-%d'),
         'fecha_final': datetime.now().strftime('%Y-%m-%d')
     }
+
+    _order = 'fecha_inicio desc'
+
+    @api.onchange('move_ids')
+    @api.depends('move_ids')
+    def _resumenes(self):
+        resumenes, TpoDocs = self._get_resumenes()
+        if self.impuestos and isinstance(self.id, int):
+            self._cr.execute("DELETE FROM account_move_consumo_folios_impuestos WHERE cf_id=%s", (self.id,))
+            self.invalidate_cache()
+        if self.detalles and isinstance(self.id, int):
+            self._cr.execute("DELETE FROM account_move_consumo_folios_detalles WHERE cf_id=%s", (self.id,))
+            self.invalidate_cache()
+        detalles = [[5,],]
+        def pushItem(key_item, item, tpo_doc):
+            rango = {
+                'tipo_operacion': 'utilizados' if key_item == 'RangoUtilizados' else 'anulados',
+                'folio_inicio': item['Inicial'],
+                'folio_final': item['Final'],
+                'cantidad': int(item['Final']) - int(item['Inicial']) +1,
+                'tpo_doc': self.env['sii.document_class'].search([('sii_code','=', tpo_doc)]).id,
+            }
+            detalles.append([0,0,rango])
+        rangos = {}
+        for r, value in resumenes.iteritems():
+            if str(r)+'_folios' in value:
+                Rangos = value[ str(r)+'_folios' ]
+                folios = []
+                if 'itemUtilizados' in Rangos:
+                    for rango in Rangos['itemUtilizados']:
+                        pushItem('RangoUtilizados', rango, r)
+                if 'itemAnulados' in Rangos:
+                    for rango in Rangos['itemAnulados']:
+                        pushItem('RangoAnulados', rango, r)
+        self.detalles = detalles
+        docs = {}
+        for r, value in resumenes.iteritems():
+            docs[r] = {
+                       'tpo_doc': self.env['sii.document_class'].search([('sii_code','=', r)]).id,
+                       'cantidad': value['FoliosUtilizados'],
+                       'monto_neto': value['MntNeto'],
+                       'monto_iva': value['MntIva'],
+                       'monto_exento': value['MntExento'],
+                       'monto_total': value['MntTotal'],
+                       }
+        lines = [[5,],]
+        for key, i in docs.items():
+            i['currency_id'] = self.env.user.company_id.currency_id.id
+            lines.append([0,0, i])
+        self.impuestos = lines
 
     @api.onchange('fecha_inicio', 'company_id')
     def set_data(self):
@@ -673,10 +730,12 @@ version="1.0">
         return det
 
     def _last(self, folio, items):# se asumen que vienen ordenados de menor a mayor
+        last = False
         for c in items:
             if folio > c['Final'] and folio > c['Inicial']:
-                return c
-        return False
+                if not last or last['Inicial'] < c['Inicial']:
+                    last = c
+        return last
 
     def _nuevo_rango(self, folio, f_contrario, contrarios):
         last = self._last(folio, contrarios)#obtengo el último tramo de los contrarios
@@ -768,6 +827,45 @@ version="1.0">
             resumenP[str(resumen['TpoDoc'])+'_folios'] = collections.OrderedDict()
         resumenP[str(resumen['TpoDoc'])+'_folios'] = self._rangosU(resumen, resumenP[str(resumen['TpoDoc'])+'_folios'], continuado)
         return resumenP
+
+    def _get_resumenes(self, marc=False):
+        resumenes = {}
+        TpoDocs = []
+        orders = []
+        recs = sorted(self.with_context(lang='es_CL').move_ids, key=lambda t: t.sii_document_number)
+        for rec in recs:
+            document_class_id = rec.document_class_id if 'document_class_id' in rec else rec.sii_document_class_id
+            if not document_class_id or document_class_id.sii_code not in [39, 41, 61]:
+                _logger.info("Por este medio solamente e pueden declarar Boletas o Notas de crédito Electrónicas, por favor elimine el documento %s del listado" % rec.name)
+                continue
+            rec.sended = marc
+            if not rec.sii_document_number:
+                orders += self.env['pos.order'].search(
+                        [
+                         ('account_move', '=', rec.id),
+                         ('invoice_id' , '=', False),
+                         ('sii_document_number', 'not in', [False, '0']),
+                         ('document_class_id.sii_code', 'in', [39, 41, 61]),
+                        ]).ids
+            else:
+                resumen = self.getResumen(rec)
+                TpoDoc = resumen['TpoDoc']
+                TpoDocs.append(TpoDoc)
+                if not TpoDoc in resumenes:
+                    resumenes[TpoDoc] = collections.OrderedDict()
+                resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc])
+        if orders:
+            orders_array = sorted(self.env['pos.order'].browse(orders).with_context(lang='es_CL'), key=lambda t: t.sii_document_number)
+            ant = 0
+            for order in orders_array:
+                resumen = self.getResumen(order)
+                TpoDoc = resumen['TpoDoc']
+                TpoDocs.append(TpoDoc)
+                if not TpoDoc in resumenes:
+                    resumenes[TpoDoc] = collections.OrderedDict()
+                resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc],((ant+1) == order.sii_document_number))
+                ant = order.sii_document_number
+        return resumenes, TpoDocs
 
     def _validar(self):
         cant_doc_batch = 0
@@ -872,7 +970,6 @@ version="1.0">
         respuesta = _server.getEstUp(self.company_id.vat[2:-1],self.company_id.vat[-1],track_id,token)
         self.sii_message = respuesta
         resp = xmltodict.parse(respuesta)
-        _logger.info(respuesta)
         status = False
         if resp['SII:RESPUESTA']['SII:RESP_HDR']['ESTADO'] == "-11":
             status =  {'warning':{'title':_('Error -11'), 'message': _("Error -11: Espere a que sea aceptado por el SII, intente en 5s más")}}
@@ -896,7 +993,6 @@ version="1.0">
                 date, str(self.amount_total),token)
         self.sii_message = respuesta
         resp = xmltodict.parse(respuesta)
-        _logger.info(resp)
         if resp['SII:RESPUESTA']['SII:RESP_HDR']['ESTADO'] == '2':
             status = {'warning':{'title':_("Error code: 2"), 'message': _(resp['SII:RESPUESTA']['SII:RESP_HDR']['GLOSA'])}}
             return status
@@ -927,3 +1023,34 @@ version="1.0">
             status = self._get_send_status(self.sii_send_ident, signature_d, token)
             if self.state != 'Proceso':
                 return status
+
+class DetalleCOnsumoFolios(models.Model):
+    _name = "account.move.consumo_folios.detalles"
+
+    cf_id = fields.Many2one('account.move.consumo_folios',
+                            string="Consumo de Folios")
+    tpo_doc = fields.Many2one('sii.document_class',
+                              string="Tipo de Documento")
+    tipo_operacion = fields.Selection([('utilizados','Utilizados'), ('anulados','Anulados')])
+    folio_inicio = fields.Integer(string="Folio Inicio")
+    folio_final = fields.Integer(string="Folio Final")
+    cantidad = fields.Integer(string="Cantidad Emitidos")
+
+class DetalleImpuestos(models.Model):
+    _name = "account.move.consumo_folios.impuestos"
+
+    cf_id = fields.Many2one('account.move.consumo_folios',
+                            string="Consumo de Folios")
+    tpo_doc = fields.Many2one('sii.document_class',
+                              string="Tipo de Documento")
+    impuesto = fields.Many2one('account.tax')
+    cantidad = fields.Integer(string="Cantidad")
+    monto_neto = fields.Monetary(string="Monto Neto")
+    monto_iva = fields.Monetary(string="Monto IVA",)
+    monto_exento = fields.Monetary(string="Monto Exento",)
+    monto_total = fields.Monetary(string="Monto Total",)
+    currency_id = fields.Many2one('res.currency',
+        string='Moneda',
+        default=lambda self: self.env.user.company_id.currency_id,
+        required=True,
+        track_visibility='always')

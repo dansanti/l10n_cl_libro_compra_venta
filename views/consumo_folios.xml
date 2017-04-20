@@ -5,12 +5,13 @@
             <field name="name">l10n_cl.libro_compra_venta.tree</field>
             <field name="model">account.move.consumo_folios</field>
             <field name="arch" type="xml">
-              <tree>
+              <tree decoration-info="state == 'draft'" decoration-muted="state == 'cancel'">
                 <field name="name" />
                 <field name="fecha_inicio" />
                 <field name="fecha_final" />
                 <field name="date" />
                 <field name="company_id" />
+                <field name="state" />
               </tree>
             </field>
         </record>
@@ -35,6 +36,25 @@
                   <field name="sec_envio" />
                   <field name="date" />
                   <field name="company_id" />
+                </group>
+                <group>
+                  <field name="impuestos" options="{'no_edit': True}">
+                          <tree >
+                            <field name="monto_neto" />
+                            <field name="monto_iva" />
+                            <field name="monto_total" />
+                          </tree>
+                    </field>
+                  <field name="detalles" >
+                        <tree>
+                          <field name="cf_id" invisible="True" />
+                          <field name="tipo_operacion" />
+                          <field name="folio_inicio" />
+                          <field name="folio_final" />
+                          <field name="cantidad" />
+                          <field name="tpo_doc" />
+                        </tree>
+                  </field>
                 </group>
                 <notebook>
                   <page string="Movimientos">
