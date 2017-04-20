@@ -770,7 +770,6 @@ version="1.0">
         return resumenP
 
     def _validar(self):
-        dicttoxml.set_debug(False)
         cant_doc_batch = 0
         company_id = self.company_id
         dte_service = company_id.dte_service_provider
@@ -784,72 +783,52 @@ version="1.0">
         signature.'''))
         certp = signature_d['cert'].replace(
             BC, '').replace(EC, '').replace('\n', '')
-        resumenes = {}
-        TpoDocs = []
-        orders = []
-        recs = sorted(self.with_context(lang='es_CL').move_ids, key=lambda t: t.sii_document_number)
-        for rec in recs:
-            document_class_id = rec.document_class_id if 'document_class_id' in rec else rec.sii_document_class_id
-            if not document_class_id or document_class_id.sii_code not in [39, 41, 61]:
-                _logger.info("Por este medio solamente e pueden declarar Boletas o Notas de crédito Electrónicas, por favor elimine el documento %s del listado" % rec.name)
-                continue
-            rec.sended = True
-            if not rec.sii_document_number:
-                orders += self.env['pos.order'].search(
-                        [('account_move', '=', rec.id),
-                         ('invoice_id' , '=', False),
-                         ('sii_document_number', 'not in', [False, '0']),
-                         ('document_class_id.sii_code', 'in', [39, 41, 61]),
-                        ]).ids
-            else:
-                resumen = self.getResumen(rec)
-                TpoDoc = resumen['TpoDoc']
-                TpoDocs.append(TpoDoc)
-                if not TpoDoc in resumenes:
-                    resumenes[TpoDoc] = collections.OrderedDict()
-                resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc])
-        if orders:
-            orders_array = sorted(self.env['pos.order'].browse(orders).with_context(lang='es_CL'), key=lambda t: t.sii_document_number)
-            ant = 0
-            for order in orders_array:
-                resumen = self.getResumen(order)
-                TpoDoc = resumen['TpoDoc']
-                TpoDocs.append(TpoDoc)
-                if not TpoDoc in resumenes:
-                    resumenes[TpoDoc] = collections.OrderedDict()
-                resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc],((ant+1) == order.sii_document_number))
-                ant = order.sii_document_number
+        resumenes, TpoDocs = self._get_resumenes(marc=True)
         Resumen=[]
-        for r, value in resumenes.iteritems():
-            _logger.info(value)
-            if str(r)+'_folios' in value:
-                folios = value[ str(r)+'_folios' ]
-                if 'itemUtilizados' in folios:
-                    for rango in folios['itemUtilizados']:
-                        utilizados = []
-                        utilizados.append({'RangoUtilizados': rango})
-                    folios['itemUtilizados'] = utilizados
-                if 'itemAnulados' in folios:
-                    for rango in folios['itemAnulados']:
-                        anulados = []
-                        anulados.append({'RangoAnulados': rango})
-                    folios['itemAnulados'] = anulados
-                value[ str(r)+'_folios' ] = folios
-            Resumen.extend([ {'Resumen':value}])
-        dte = collections.OrderedDict({'item':Resumen})
+        listado = [ 'TipoDocumento', 'MntNeto', 'MntIva', 'TasaIVA', 'MntExento', 'MntTotal', 'FoliosEmitidos',  'FoliosAnulados', 'FoliosUtilizados', 'itemUtilizados' ]
+        xml = '<Resumen><TipoDocumento>39</TipoDocumento><MntTotal>0</MntTotal><FoliosEmitidos>0</FoliosEmitidos><FoliosAnulados>0</FoliosAnulados><FoliosUtilizados>0</FoliosUtilizados></Resumen>'
+        if resumenes:
+            for r, value in resumenes.iteritems():
+                ordered = collections.OrderedDict()
+                for i in listado:
+                    if i in value:
+                        ordered[i] = value[i]
+                    elif i == 'itemUtilizados':
+                        Rangos = value[ str(r)+'_folios' ]
+                        folios = []
+                        if 'itemUtilizados' in Rangos:
+                            utilizados = []
+                            for rango in Rangos['itemUtilizados']:
+                                utilizados.append({'RangoUtilizados': rango})
+                            folios.append({'itemUtilizados': utilizados})
+                        if 'itemAnulados' in Rangos:
+                            anulados = []
+                            for rango in Rangos['itemAnulados']:
+                                anulados.append({'RangoAnulados': rango})
+                            folios.append({'itemAnulados': anulados})
+                        ordered[ str(r)+'_folios' ] = folios
+                Resumen.extend([ {'Resumen': ordered}])
+            dte = collections.OrderedDict({'item':Resumen})
+            xml = dicttoxml.dicttoxml(
+                dte,
+                root=False,
+                attr_type=False)
         resol_data = self.get_resolution_data(company_id)
         RUTEmisor = self.format_vat(company_id.vat)
         RUTRecep = "60803000-K" # RUT SII
-        xml = dicttoxml.dicttoxml(
-            dte, root=False, attr_type=False)
         doc_id =  'CF_'+self.date
         Correlativo = self.correlativo
         SecEnvio = self.sec_envio
         cf = self.create_template_envio( RUTEmisor,
             resol_data['dte_resolution_date'],
             resol_data['dte_resolution_number'],
-            FchInicio, FchFinal, Correlativo, SecEnvio,
-            xml, signature_d, doc_id)
+            self.fecha_inicio,
+            self.fecha_final,
+            Correlativo,
+            SecEnvio,
+            xml,
+            signature_d,
+            doc_id)
         xml  = self.create_template_env(cf)
         root = etree.XML( xml )
         xml_pret = etree.tostring(root, pretty_print=True)\
@@ -860,11 +839,13 @@ version="1.0">
                 .replace('<itemAnulados>','').replace('</itemAnulados>','\n')
         for TpoDoc in TpoDocs:
         	xml_pret = xml_pret.replace('<key name="'+str(TpoDoc)+'_folios">','').replace('</key>','\n').replace('<key name="'+str(TpoDoc)+'_folios"/>','\n')
-        _logger.info(xml_pret)
         envio_dte = self.convert_encoding(xml_pret, 'ISO-8859-1')
         envio_dte = self.sign_full_xml(
-            envio_dte, signature_d['priv_key'], certp,
-            doc_id, 'consu')
+            envio_dte,
+            signature_d['priv_key'],
+            certp,
+            doc_id,
+            'consu')
         doc_id += '.xml'
         self.sii_xml_request = envio_dte
         #self.send_file_name = doc_id
