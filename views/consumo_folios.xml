@@ -38,10 +38,11 @@
                   <field name="company_id" />
                 </group>
                 <group>
-                  <field name="impuestos" options="{'no_edit': True}">
+                  <field name="impuestos" options="{'no_edit': True, 'no_create': True}">
                           <tree >
                             <field name="monto_neto" />
                             <field name="monto_iva" />
+                            <field name="monto_exento" />
                             <field name="monto_total" />
                           </tree>
                     </field>
