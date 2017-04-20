@@ -10,6 +10,12 @@
                 <field name="fecha_inicio" />
                 <field name="fecha_final" />
                 <field name="date" />
+                <field name="total_boletas" />
+                <field name="total_iva" />
+                <field name="total_exento" />
+                <field name="total" />
+                <field name="currency_id" invisible="True" />
+                <field name="date" />
                 <field name="company_id" />
                 <field name="state" />
               </tree>
@@ -36,6 +42,10 @@
                   <field name="sec_envio" />
                   <field name="date" />
                   <field name="company_id" />
+                  <field name="total_boletas" />
+                  <field name="total_iva" />
+                  <field name="total_exento" />
+                  <field name="total" />
                 </group>
                 <group>
                   <field name="impuestos" options="{'no_edit': True, 'no_create': True}">

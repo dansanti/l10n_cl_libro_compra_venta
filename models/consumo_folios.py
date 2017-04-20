@@ -161,10 +161,15 @@ class ConsumoFolios(models.Model):
     	readony=True,
         states={'draft': [('readonly', False)]},)
     sec_envio = fields.Integer(string="Secuencia de Envío",
-    	readony=True,
         states={'draft': [('readonly', False)]},)
-    #total_afecto = fields.Char(string="Total Afecto")
-    #total_exento = fields.Char(string="Total Exento")
+    total_iva = fields.Monetary(compute='get_totales',
+       string="Total Iva")
+    total_exento = fields.Monetary(compute='get_totales',
+       string="Total Exento")
+    total = fields.Monetary(compute='get_totales',
+       string="Monto Total")
+    total_boletas = fields.Integer(compute='get_totales',
+       string="Total Boletas")
     company_id = fields.Many2one('res.company',
         required=True,
         default=lambda self: self.env.user.company_id.id,
@@ -182,6 +187,11 @@ class ConsumoFolios(models.Model):
     impuestos = fields.One2many('account.move.consumo_folios.impuestos',
        'cf_id',
        string="Detalle Impuestos")
+    currency_id = fields.Many2one('res.currency',
+        string='Moneda',
+        default=lambda self: self.env.user.company_id.currency_id,
+        required=True,
+        track_visibility='always')
 
     _defaults = {
         'date' : datetime.now(),
@@ -190,6 +200,26 @@ class ConsumoFolios(models.Model):
     }
 
     _order = 'fecha_inicio desc'
+
+    @api.onchange('impuestos')
+    def get_totales(self):
+        for r in self:
+            total_iva = 0
+            total_exento = 0
+            total = 0
+            total_boletas = 0
+            for d in r.impuestos:
+                total_iva += d.monto_iva
+                total_exento += d.monto_exento
+                total += d.monto_total
+            for d in r.detalles:
+                if d.tpo_doc.sii_code in [39, 41]:
+                    total_boletas += d.cantidad
+            r.total_iva = total_iva
+            r.total_exento = total_exento
+            r.total = total
+            r.total_boletas = total_boletas
+
 
     @api.onchange('move_ids')
     @api.depends('move_ids')
