@@ -163,7 +163,7 @@ class Libro(models.Model):
     tipo_operacion = fields.Selection([
                 ('COMPRA','Compras'),
                 ('VENTA','Ventas'),
-                ('BOLETA','Boleta'),
+                ('BOLETA','Boleta Electrónica'),
                 ],
                 string="Tipo de operación",
                 default="COMPRA",
@@ -279,30 +279,61 @@ class Libro(models.Model):
             domain = 'purchase'
         query.append(('journal_id.type', '=', domain))
         if self.tipo_operacion in [ 'VENTA' ]:
-            docs.extend([35, 38, 39, 41])
-            libro_boletas = self.env['account.move.consumo_folios'].search([
+            libro_boletas = self.env['account.move.book'].search([
                 ('state','not in', ['draft']),
-                ('fecha_inicio','>=', current),
-                ('fecha_inicio','<', next_month),
+                ('periodo_tributario','=', self.periodo_tributario),
+                ('tipo_operacion','=', 'BOLETA'),
             ])
             if libro_boletas:
+                cfs = self.env['account.move.consumo_folios'].search([
+                    ('state','not in', ['draft']),
+                    ('fecha_inicio','>=', current),
+                    ('fecha_inicio','<', next_month),
+                ])
+                cantidad = {}
+                for cf in cfs:
+                    for det in cf.detalles:
+                        if det.tpo_doc.sii_code in [39, 41]:
+                            if  not det.tpo_doc in cantidad:
+                                cantidad[str(det.tpo_doc.sii_code)] += det.cantidad
+                            else:
+                                cantidad[str(det.tpo_doc.sii_code)] += det.cantidad
                 lines = [[5,],]
-                for det in libro_boletas.detalles:
+                for det in libro_boletas.impuesto:
                     line = {
                         'currency_id' : self.env.user.company_id.currency_id,
-                        'tipo_boleta' : det.tpo_doc,
-                        'cantidad_boletas' : det.cantidad ,
+                        'tipo_boleta' : self.env['sii.document_class'].search([('sii_code','=', 39)],limit=1).id,
+                        'cantidad_boletas' : cantidad['39'] ,
                         'neto' : det.monto_neto,
-                        'impuesto' : self.env['account.tax'].search([('sii_code','=', 14), ('type_tax_use','=','sale'),('company','=',self.company_id.id)],limit=1).id,
+                        'impuesto' : self.env['account.tax'].search([('sii_code','=', 14), ('type_tax_use','=','sale'),('company_id','=',self.company_id.id)],limit=1).id,
                         'monto_impuesto' : det.monto_iva,
                         'monto_exento': det.monto_exento,
                         }
                     lines.append([0,0, line])
                 self.detalles = lines
+        elif self.tipo_operacion in [ 'BOLETA' ]:
+            docs = [35, 38, 39, 41]
+            cfs = self.env['account.move.consumo_folios'].search([
+                ('state','not in', ['draft']),
+                ('fecha_inicio','>=', current),
+                ('fecha_inicio','<', next_month),
+            ])
+            lines = [[5,],]
+            monto_iva = 0
+            monto_exento = 0
+            for cf in cfs:
+                for i in cf.impuestos:
+                    monto_iva += i.monto_iva
+                    monto_exento += i.monto_exento
+            lines.extend([
+                 [0,0, {'tax_id': self.env['account.tax'].search([('sii_code','=', 14), ('type_tax_use','=','sale'),('company_id','=',self.company_id.id)],limit=1).id, 'credit': monto_iva, 'currency_id' : self.env.user.company_id.currency_id.id}],
+                 [0,0, {'tax_id': self.env['account.tax'].search([('sii_code','=', 0), ('type_tax_use','=','sale'),('company_id','=',self.company_id.id)],limit=1).id, 'credit': monto_exento, 'currency_id' : self.env.user.company_id.currency_id.id}]
+                 ])
+            self.impuestos = lines
+            operator = 'in'
         if self.tipo_operacion in [ 'VENTA', 'BOLETA' ]:
             query.append(('date' , '>=', current.strftime('%Y-%m-%d')))
-        if self.tipo_operacion in [ 'BOLETA' ]:
-            operator = 'in'
+
         query.append(('document_class_id.sii_code', operator, docs))
         self.move_ids = self.env['account.move'].search(query)
 
@@ -310,13 +341,14 @@ class Libro(models.Model):
     def _get_imps(self):
         imp = {}
         for move in self.move_ids:
-            move_imps = move._get_move_imps()
-            for key, i in move_imps.items():
-                if not key in imp:
-                    imp[key] = i
-                else:
-                    imp[key]['credit'] += i['credit']
-                    imp[key]['debit'] += i['debit']
+            if move.document_class_id.sii_code not in [35, 38, 39, 41, False, 0]:
+                move_imps = move._get_move_imps()
+                for key, i in move_imps.items():
+                    if not key in imp:
+                        imp[key] = i
+                    else:
+                        imp[key]['credit'] += i['credit']
+                        imp[key]['debit'] += i['debit']
         return imp
 
     @api.onchange('move_ids')
@@ -331,18 +363,19 @@ class Libro(models.Model):
 
     @api.onchange('move_ids')
     def compute_taxes(self):
-        imp = self._get_imps()
-        if self.boletas:
-            for bol in self.boletas:
-                imp[bol.impuesto.id]['debit'] += bol.monto_impuesto
-        if self.impuestos and isinstance(self.id, int):
-            self._cr.execute("DELETE FROM account_move_book_tax WHERE book_id=%s", (self.id,))
-            self.invalidate_cache()
-        lines = [[5,],]
-        for key, i in imp.items():
-            i['currency_id'] = self.env.user.company_id.currency_id.id
-            lines.append([0,0, i])
-        self.impuestos = lines
+        if self.tipo_operacion not in [ 'BOLETA' ]:
+            imp = self._get_imps()
+            if self.boletas:
+                for bol in self.boletas:
+                    imp[bol.impuesto.id]['credit'] += bol.monto_impuesto
+            if self.impuestos and isinstance(self.id, int):
+                self._cr.execute("DELETE FROM account_move_book_tax WHERE book_id=%s", (self.id,))
+                self.invalidate_cache()
+            lines = [[5,],]
+            for key, i in imp.items():
+                i['currency_id'] = self.env.user.company_id.currency_id.id
+                lines.append([0,0, i])
+            self.impuestos = lines
 
     @api.multi
     def unlink(self):
@@ -822,13 +855,13 @@ version="1.0">
                 if l.tax_line_id and l.tax_line_id.amount > 0:
                     if l.tax_line_id.sii_code in [14, 15, 17, 18, 19, 30,31, 32 ,33, 34, 36, 37, 38, 39, 41, 47, 48]: # diferentes tipos de IVA retenidos o no
                         if not l.tax_line_id.id in ivas:
-                            ivas[l.tax_line_id.id] = {'det': l.tax_line_id, 'TaxMnt': 0}
+                            ivas[l.tax_line_id.id] = {'det': l.tax_line_id, 'credit':0, 'debit': 0}
                         if l.credit > 0:
-                            ivas[l.tax_line_id.id]['TaxMnt'] += l.credit
+                            ivas[l.tax_line_id.id]['credit'] += l.credit
                             if l.tax_line_id.activo_fijo:
                                 ActivoFijo[1] += l.credit
                         else:
-                            ivas[l.tax_line_id.id]['TaxMnt'] += l.debit
+                            ivas[l.tax_line_id.id]['debit'] += l.debit
                             if l.tax_line_id.activo_fijo:
                                 ActivoFijo[1] += l.debit
                     else:
@@ -887,9 +920,12 @@ version="1.0">
             if ivas: # Es algún tipo de iva que puede ser adicional o anticipado
                 MntIVA = 0
                 for key, i in ivas.items():
+                    Mnt = i['credit'] or i['debit']
+                    if round(i['credit'] - i['debit']) != 0:
+                        Mnt = i['credit'] + i['debit']
                     if i['det'].sii_code not in [14]:
-                        imp[i['det'].id] = {'imp': i['det'], 'Mnt': i['TaxMnt']}
-                    MntIVA += int(round(i['TaxMnt']))
+                        imp[i['det'].id] = {'imp': i['det'], 'Mnt': Mnt}
+                    MntIVA += int(round(Mnt))
                 if not rec.no_rec_code and not rec.iva_uso_comun:
                     det['MntIVA'] = MntIVA
                 if ActivoFijo != [0,0]:
@@ -919,11 +955,16 @@ version="1.0">
                 tasa = i['det']
                 if tasa.sii_type in ['R']:
                     if tasa.retencion == tasa.amount:
-                        det['IVARetTotal'] = int(round(i['TaxMnt']))
+                        det['IVARetTotal'] = int(round(i['credit'] or i['debit']))
                         MntIVA -= det['IVARetTotal']
                     else:
-                        det['IVARetParcial'] = int(round(Neto * (tasa.retencion / 100)))
-                        det['IVANoRetenido'] = int(round(i['TaxMnt'] - (Neto * (tasa.retencion / 100))))
+                        reten = i['credit']
+                        tax = i['debit']
+                        if self.tipo_operacion in ['VENTA']:
+                            tax = i['credit']
+                            reten = i['debit']
+                        det['IVARetParcial'] = int(round(reten))
+                        det['IVANoRetenido'] = int(round(tax))
                         MntIVA -= det['IVARetParcial']
         monto_total = int(round((Neto + MntExe + TaxMnt + MntIVA), 0))
         if no_product :
