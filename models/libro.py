@@ -3,6 +3,7 @@ from openerp import fields, models, api, _
 from openerp.exceptions import UserError
 from datetime import datetime, timedelta
 import dateutil.relativedelta as relativedelta
+from openerp.tools import DEFAULT_SERVER_DATETIME_FORMAT as DTF
 import logging
 from lxml import etree
 from lxml.etree import Element, SubElement
@@ -467,6 +468,7 @@ class Libro(models.Model):
                 xmlschema.assert_(xml_doc)
             return result
         except AssertionError as e:
+            _logger.warning(some_xml_string)
             raise UserError(_('XML Malformed Error:  %s') % e.args)
 
     '''
@@ -685,7 +687,6 @@ version="1.0">
             obj = user = self[0].responsable_envio
         if not obj:
             obj = user = self.env.user
-        _logger.info(obj.name)
         if not obj.cert:
             obj = self.env['res.users'].search([("authorized_users_ids","=", user.id)])
             if not obj or not obj.cert:
@@ -1025,8 +1026,18 @@ version="1.0">
             det['FchEmiDoc'] = rec.date
             det['FchVencDoc'] = rec.date
         except:
-            det['FchEmiDoc'] = rec.date_order[:10]
-            det['FchVencDoc'] = rec.date_order[:10]
+            util_model = self.env['cl.utils']
+            fields_model = self.env['ir.fields.converter']
+            from_zone = pytz.UTC
+            to_zone = pytz.timezone('America/Santiago')
+            date_order = util_model._change_time_zone(datetime.strptime(rec.date_order, DTF), from_zone, to_zone).strftime(DTF)
+            til_model = self.env['cl.utils']
+            fields_model = self.env['ir.fields.converter']
+            from_zone = pytz.UTC
+            to_zone = pytz.timezone('America/Santiago')
+            date_order = util_model._change_time_zone(datetime.strptime(rec.date_order, DTF), from_zone, to_zone).strftime(DTF)
+            det['FchEmiDoc'] = date_order[:10]
+            det['FchVencDoc'] = date_order[:10]
         #det['PeriodoDesde']
         #det['PeriodoHasta']
         #det['CdgSIISucur']
@@ -1267,7 +1278,7 @@ version="1.0">
             resumenP['TotalesServicio']['TotMntNeto'] += resumen['MntNeto']
         elif not 'TotMntNeto' in resumenP['TotalesServicio']:
             resumenP['TotalesServicio']['TotMntNeto'] = 0
-        if 'MntIVA' in resumen:
+        if 'MntIVA' in resumen and resumen['MntIVA'] > 0:
             resumenP['TotalesServicio']['TasaIVA'] = resumen['TasaIVA']
         if 'MntIVA' in resumen and not 'TotMntIVA' in resumenP['TotalesServicio']:
             resumenP['TotalesServicio']['TotMntIVA'] = resumen['MntIVA']
@@ -1319,7 +1330,8 @@ version="1.0">
                         resumenesPeriodo[TpoDoc] = self._setResumenPeriodoBoleta(resumen, resumenesPeriodo[TpoDoc])
                         del(resumen['MntNeto'])
                         del(resumen['MntIVA'])
-                        del(resumen['TasaIVA'])
+                        if 'TasaIVA' in resumen:
+                            del(resumen['TasaIVA'])
                         resumenes.extend([{'Detalle':resumen}])
                 else:
                     resumen = self.getResumenBoleta(rec)
