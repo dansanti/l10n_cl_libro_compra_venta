@@ -886,15 +886,17 @@ version="1.0">
                 resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc])
         if orders:
             orders_array = sorted(self.env['pos.order'].browse(orders).with_context(lang='es_CL'), key=lambda t: t.sii_document_number)
-            ant = 0
+            ant = {}
             for order in orders_array:
                 resumen = self.getResumen(order)
                 TpoDoc = resumen['TpoDoc']
+                if not str(TpoDoc) in ant:
+                    ant[str(TpoDoc)] = 0
                 TpoDocs.append(TpoDoc)
                 if not TpoDoc in resumenes:
                     resumenes[TpoDoc] = collections.OrderedDict()
-                resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc],((ant+1) == order.sii_document_number))
-                ant = order.sii_document_number
+                resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc],((ant[str(TpoDoc)]+1) == order.sii_document_number))
+                ant[str(TpoDoc)] = order.sii_document_number
         return resumenes, TpoDocs
 
     def _validar(self):
