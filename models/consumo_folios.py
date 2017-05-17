@@ -757,6 +757,8 @@ version="1.0">
         monto_total = int(round((Neto + MntExe + TaxMnt), 0))
         det['MntNeto'] = int(round(Neto))
         det['MntTotal'] = monto_total
+        #if rec.anulado:
+        #    det['Anulados'] = 'A'
         return det
 
     def _last(self, folio, items):# se asumen que vienen ordenados de menor a mayor
@@ -792,7 +794,7 @@ version="1.0">
         if not rangos:
             rangos = collections.OrderedDict()
         folio = resumen['NroDoc']
-        if 'A' in resumen:
+        if 'Anulado' in resumen and resumen['Anulado'] == 'A':
             utilizados = rangos['itemUtilizados'] if 'itemUtilizados' in rangos else []
             if not 'itemAnulados' in rangos:
                 rangos['itemAnulados'] = []
@@ -802,7 +804,7 @@ version="1.0">
                 rangos['itemAnulados'].append(r)
             else:
                 rangos['itemAnulados'] = self._orden(resumen['NroDoc'], rangos['itemAnulados'], utilizados, continuado)
-                return rangos
+            return rangos
         anulados = rangos['itemAnulados'] if 'itemAnulados' in rangos else []
         if not 'itemUtilizados' in rangos:
             rangos['itemUtilizados'] = []
