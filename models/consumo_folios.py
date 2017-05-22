@@ -757,8 +757,8 @@ version="1.0">
         monto_total = int(round((Neto + MntExe + TaxMnt), 0))
         det['MntNeto'] = int(round(Neto))
         det['MntTotal'] = monto_total
-        #if rec.anulado:
-        #    det['Anulados'] = 'A'
+        if rec.canceled:
+            det['Anulados'] = 'A'
         return det
 
     def _last(self, folio, items):# se asumen que vienen ordenados de menor a mayor
