@@ -275,7 +275,6 @@ class ConsumoFolios(models.Model):
         self.fecha_final = self.fecha_inicio
         self.move_ids = self.env['account.move'].search([
             ('document_class_id.sii_code', 'in', [39, 41]),
-            ('sended','=', False),
             ('date', '=', self.fecha_inicio),
             ('company_id', '=', self.company_id.id),
             ]).ids
@@ -860,7 +859,7 @@ version="1.0">
         resumenP[str(resumen['TpoDoc'])+'_folios'] = self._rangosU(resumen, resumenP[str(resumen['TpoDoc'])+'_folios'], continuado)
         return resumenP
 
-    def _get_resumenes(self, marc=False):
+    def _get_resumenes(self):
         resumenes = {}
         TpoDocs = []
         orders = []
@@ -870,7 +869,6 @@ version="1.0">
             if not document_class_id or document_class_id.sii_code not in [39, 41, 61]:
                 _logger.info("Por este medio solamente e pueden declarar Boletas o Notas de crédito Electrónicas, por favor elimine el documento %s del listado" % rec.name)
                 continue
-            rec.sended = marc
             if not rec.sii_document_number:
                 orders += self.env['pos.order'].search(
                         [
@@ -915,7 +913,7 @@ version="1.0">
         signature.'''))
         certp = signature_d['cert'].replace(
             BC, '').replace(EC, '').replace('\n', '')
-        resumenes, TpoDocs = self._get_resumenes(marc=True)
+        resumenes, TpoDocs = self._get_resumenes()
         Resumen=[]
         listado = [ 'TipoDocumento', 'MntNeto', 'MntIva', 'TasaIVA', 'MntExento', 'MntTotal', 'FoliosEmitidos',  'FoliosAnulados', 'FoliosUtilizados', 'itemUtilizados' ]
         xml = '<Resumen><TipoDocumento>39</TipoDocumento><MntTotal>0</MntTotal><FoliosEmitidos>0</FoliosEmitidos><FoliosAnulados>0</FoliosAnulados><FoliosUtilizados>0</FoliosUtilizados></Resumen>'
