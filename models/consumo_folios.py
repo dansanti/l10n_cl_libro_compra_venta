@@ -1055,8 +1055,8 @@ version="1.0">
         xml_response = xmltodict.parse(self.sii_xml_response)
         if self.state == 'Enviado':
             status = self._get_send_status(self.sii_send_ident, signature_d, token)
-            if self.state != 'Proceso':
-                return status
+            #if self.state != 'Proceso':
+            return status
 
 class DetalleCOnsumoFolios(models.Model):
     _name = "account.move.consumo_folios.detalles"

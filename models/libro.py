@@ -1421,11 +1421,11 @@ version="1.0">
         status = False
         if resp['SII:RESPUESTA']['SII:RESP_HDR']['ESTADO'] == "-11":
             status =  {'warning':{'title':_('Error -11'), 'message': _("Error -11: Espere a que sea aceptado por el SII, intente en 5s más")}}
-        if resp['SII:RESPUESTA']['SII:RESP_HDR']['ESTADO'] == "EPR":
+        if resp['SII:RESPUESTA']['SII:RESP_HDR']['ESTADO'] == "LOK":
             self.state = "Proceso"
             if 'SII:RESP_BODY' in resp['SII:RESPUESTA'] and resp['SII:RESPUESTA']['SII:RESP_BODY']['RECHAZADOS'] == "1":
                 self.sii_result = "Rechazado"
-        elif resp['SII:RESPUESTA']['SII:RESP_HDR']['ESTADO'] == "RCT":
+        elif resp['SII:RESPUESTA']['SII:RESP_HDR']['ESTADO'] == "LRH":
             self.state = "Rechazado"
             status = {'warning':{'title':_('Error RCT'), 'message': _(resp['SII:RESPUESTA']['GLOSA'])}}
         return status
@@ -1469,8 +1469,8 @@ version="1.0">
         xml_response = xmltodict.parse(self.sii_xml_response)
         if self.state == 'Enviado':
             status = self._get_send_status(self.sii_send_ident, signature_d, token)
-            if self.state != 'Proceso':
-                return status
+            #if self.state != 'Proceso':
+            return status
 
 class Boletas(models.Model):
     _name = 'account.move.book.boletas'
