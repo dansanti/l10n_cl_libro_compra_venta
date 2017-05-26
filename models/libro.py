@@ -110,6 +110,15 @@ connection_status = {
     'Otro': 'Error Interno.',
 }
 
+allowed_docs = [29, 30, 32, 33, 34, 35, 38, 39, 40,
+                41, 43, 45, 46, 48, 53, 55, 56, 60,
+                61, 101, 102, 103, 104, 105, 106, 108,
+                109, 110, 111, 112, 175, 180, 185, 900,
+                901, 902, 903, 904, 905, 906, 907, 909,
+                910, 911, 914, 918, 919, 920, 921, 922,
+                924, 500, 501,
+                ]
+
 class Libro(models.Model):
     _name = "account.move.book"
 
@@ -909,9 +918,15 @@ version="1.0">
             det['CdgSIISucur'] = rec.journal_id.sii_code
         det['RUTDoc'] = self.format_vat(rec.partner_id.vat)
         det['RznSoc'] = rec.partner_id.name[:50]
-        if inv.referencias and inv.referencias[0].sii_referencia_CodRef:
-            det['TpoDocRef'] = inv.referencias[0].sii_referencia_TpoDocRef.sii_code
-            det['FolioDocRef'] = inv.referencias[0].origen
+        refs = []
+        for ref in inv.referencias:
+            if ref.sii_referencia_CodRef and ref.sii_referencia_TpoDocRef.sii_code in allowed_docs:
+                refs.append({
+                    'TpoDocRef': ref.sii_referencia_TpoDocRef.sii_code,
+                    'FolioDocRef': ref.origen
+                    })
+        if refs:
+            det['item_refs'] = refs
         if MntExe > 0 :
             det['MntExe'] = int(round(MntExe,0))
         elif self.tipo_operacion in ['VENTA'] and not Neto > 0:
@@ -1389,11 +1404,15 @@ version="1.0">
                 .replace('<item>','\n').replace('</item>','')\
                 .replace('<itemNoRec>','').replace('</itemNoRec>','\n')\
                 .replace('<itemOtrosImp>','').replace('</itemOtrosImp>','\n')\
+                .replace('<item_refs>','').replace('</item_refs>','\n')\
                 .replace('_no_rec','')
         envio_dte = self.convert_encoding(xml_pret, 'ISO-8859-1')
         envio_dte = self.sign_full_xml(
-            envio_dte, signature_d['priv_key'], certp,
-            doc_id, env)
+            envio_dte,
+            signature_d['priv_key'],
+            certp,
+            doc_id,
+            env)
         self.sii_xml_request = envio_dte
         return envio_dte, doc_id
 
