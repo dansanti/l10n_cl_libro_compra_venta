@@ -11,6 +11,7 @@
                 <field name="fecha_final" />
                 <field name="date" />
                 <field name="total_boletas" />
+                <field name="total_neto" />
                 <field name="total_iva" />
                 <field name="total_exento" />
                 <field name="total" />
