@@ -2,6 +2,8 @@
 from openerp import fields, models, api, _
 from openerp.exceptions import UserError
 from datetime import datetime, timedelta
+import dateutil.relativedelta as relativedelta
+from openerp.tools import DEFAULT_SERVER_DATETIME_FORMAT as DTF
 import logging
 from lxml import etree
 from lxml.etree import Element, SubElement
@@ -162,6 +164,8 @@ class ConsumoFolios(models.Model):
         states={'draft': [('readonly', False)]},)
     sec_envio = fields.Integer(string="Secuencia de Envío",
         states={'draft': [('readonly', False)]},)
+    total_neto = fields.Monetary(compute='get_totales',
+           string="Total Neto")
     total_iva = fields.Monetary(compute='get_totales',
        string="Total Iva")
     total_exento = fields.Monetary(compute='get_totales',
@@ -215,6 +219,7 @@ class ConsumoFolios(models.Model):
             for d in r.detalles:
                 if d.tpo_doc.sii_code in [39, 41]:
                     total_boletas += d.cantidad
+            r.total_neto = total - total_iva - total_exento
             r.total_iva = total_iva
             r.total_exento = total_exento
             r.total = total
@@ -275,6 +280,7 @@ class ConsumoFolios(models.Model):
         self.fecha_final = self.fecha_inicio
         self.move_ids = self.env['account.move'].search([
             ('document_class_id.sii_code', 'in', [39, 41]),
+#            ('sended','=', False),
             ('date', '=', self.fecha_inicio),
             ('company_id', '=', self.company_id.id),
             ]).ids
@@ -301,7 +307,7 @@ class ConsumoFolios(models.Model):
 
     def create_template_envio(self, RutEmisor, FchResol, NroResol, FchInicio, FchFinal, Correlativo, SecEnvio, EnvioDTE, signature_d, IdEnvio='SetDoc'):
         if Correlativo != 0:
-            Correlativo = "<Correlativo>"+Correlativo+"</Correlativo>"
+            Correlativo = "<Correlativo>"+str(Correlativo)+"</Correlativo>"
         else:
             Correlativo = ''
         xml = '''<DocumentoConsumoFolios ID="{10}">
@@ -756,8 +762,6 @@ version="1.0">
         monto_total = int(round((Neto + MntExe + TaxMnt), 0))
         det['MntNeto'] = int(round(Neto))
         det['MntTotal'] = monto_total
-        if rec.canceled:
-            det['Anulados'] = 'A'
         return det
 
     def _last(self, folio, items):# se asumen que vienen ordenados de menor a mayor
@@ -793,7 +797,7 @@ version="1.0">
         if not rangos:
             rangos = collections.OrderedDict()
         folio = resumen['NroDoc']
-        if 'Anulado' in resumen and resumen['Anulado'] == 'A':
+        if 'Anulado' in resumen and resumen['Anulado']:
             utilizados = rangos['itemUtilizados'] if 'itemUtilizados' in rangos else []
             if not 'itemAnulados' in rangos:
                 rangos['itemAnulados'] = []
@@ -859,7 +863,7 @@ version="1.0">
         resumenP[str(resumen['TpoDoc'])+'_folios'] = self._rangosU(resumen, resumenP[str(resumen['TpoDoc'])+'_folios'], continuado)
         return resumenP
 
-    def _get_resumenes(self):
+    def _get_resumenes(self, marc=False):
         resumenes = {}
         TpoDocs = []
         orders = []
@@ -869,23 +873,26 @@ version="1.0">
             if not document_class_id or document_class_id.sii_code not in [39, 41, 61]:
                 _logger.info("Por este medio solamente e pueden declarar Boletas o Notas de crédito Electrónicas, por favor elimine el documento %s del listado" % rec.name)
                 continue
-            if not rec.sii_document_number:
-                orders += self.env['pos.order'].search(
-                        [
-                         ('account_move', '=', rec.id),
-                         ('invoice_id' , '=', False),
-                         ('sii_document_number', 'not in', [False, '0']),
-                         ('document_class_id.sii_code', 'in', [39, 41, 61]),
-                        ]).ids
-            else:
+            if rec.sii_document_number:
                 resumen = self.getResumen(rec)
                 TpoDoc = resumen['TpoDoc']
                 TpoDocs.append(TpoDoc)
                 if not TpoDoc in resumenes:
                     resumenes[TpoDoc] = collections.OrderedDict()
                 resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc])
-        if orders:
-            orders_array = sorted(self.env['pos.order'].browse(orders).with_context(lang='es_CL'), key=lambda t: t.sii_document_number)
+            rec.sended = marc
+        if 'pos.order' in self.env:
+            current = self.fecha_inicio + ' 03:00:00'
+            next_day = (datetime.strptime(current, DTF) + relativedelta.relativedelta(days=1)).strftime('%Y-%m-%d') + ' 03:00:00'
+            orders_array = sorted(self.env['pos.order'].search(
+                [
+                 ('invoice_id' , '=', False),
+                 ('sii_document_number', 'not in', [False, '0']),
+                 ('document_class_id.sii_code', 'in', [39, 41, 61]),
+                 ('date_order','>=', current),
+                 ('date_order','<', next_day),
+                ]
+            ).with_context(lang='es_CL'), key=lambda t: t.sii_document_number)
             ant = {}
             for order in orders_array:
                 resumen = self.getResumen(order)
@@ -913,7 +920,7 @@ version="1.0">
         signature.'''))
         certp = signature_d['cert'].replace(
             BC, '').replace(EC, '').replace('\n', '')
-        resumenes, TpoDocs = self._get_resumenes()
+        resumenes, TpoDocs = self._get_resumenes(marc=True)
         Resumen=[]
         listado = [ 'TipoDocumento', 'MntNeto', 'MntIva', 'TasaIVA', 'MntExento', 'MntTotal', 'FoliosEmitidos',  'FoliosAnulados', 'FoliosUtilizados', 'itemUtilizados' ]
         xml = '<Resumen><TipoDocumento>39</TipoDocumento><MntTotal>0</MntTotal><FoliosEmitidos>0</FoliosEmitidos><FoliosAnulados>0</FoliosAnulados><FoliosUtilizados>0</FoliosUtilizados></Resumen>'
@@ -1009,7 +1016,7 @@ version="1.0">
             self.state = "Proceso"
             if 'SII:RESP_BODY' in resp['SII:RESPUESTA'] and resp['SII:RESPUESTA']['SII:RESP_BODY']['RECHAZADOS'] == "1":
                 self.sii_result = "Rechazado"
-        elif resp['SII:RESPUESTA']['SII:RESP_HDR']['ESTADO'] == "RCH":
+        elif resp['SII:RESPUESTA']['SII:RESP_HDR']['ESTADO'] == "RCT":
             self.state = "Rechazado"
             status = {'warning':{'title':_('Error RCT'), 'message': _(resp['SII:RESPUESTA']['GLOSA'])}}
         return status
@@ -1053,8 +1060,8 @@ version="1.0">
         xml_response = xmltodict.parse(self.sii_xml_response)
         if self.state == 'Enviado':
             status = self._get_send_status(self.sii_send_ident, signature_d, token)
-            #if self.state != 'Proceso':
-            return status
+            if self.state != 'Proceso':
+                return status
 
 class DetalleCOnsumoFolios(models.Model):
     _name = "account.move.consumo_folios.detalles"
