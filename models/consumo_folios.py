@@ -115,22 +115,22 @@ class ConsumoFolios(models.Model):
     sii_message = fields.Text(
         string='SII Message',
         copy=False,
-        readony=True,
+        readonly=True,
         states={'draft': [('readonly', False)]},)
     sii_xml_request = fields.Text(
         string='SII XML Request',
         copy=False,
-        readony=True,
+        readonly=True,
         states={'draft': [('readonly', False)]},)
     sii_xml_response = fields.Text(
         string='SII XML Response',
         copy=False,
-        readony=True,
+        readonly=True,
         states={'draft': [('readonly', False)]},)
     sii_send_ident = fields.Text(
         string='SII Send Identification',
         copy=False,
-        readony=True,
+        readonly=True,
         states={'draft': [('readonly', False)]},)
     state = fields.Selection([
         ('draft', 'Borrador'),
@@ -150,52 +150,86 @@ class ConsumoFolios(models.Model):
              " * The 'Open' status is used when user create invoice, an invoice number is generated. Its in open status till user does not pay invoice.\n"
              " * The 'Paid' status is set automatically when the invoice is paid. Its related journal entries may or may not be reconciled.\n"
              " * The 'Cancelled' status is used when user cancel invoice.")
-    move_ids = fields.Many2many('account.move',
-    	readony=True,
+    move_ids = fields.Many2many(
+        'account.move',
+    	readonly=True,
         states={'draft': [('readonly', False)]},)
-    fecha_inicio = fields.Date(string="Fecha Inicio",
-    	readony=True,
+    fecha_inicio = fields.Date(
+        string="Fecha Inicio",
+    	readonly=True,
         states={'draft': [('readonly', False)]},)
-    fecha_final = fields.Date(string="Fecha Final",
-    	readony=True,
+    fecha_final = fields.Date(
+        string="Fecha Final",
+    	readonly=True,
         states={'draft': [('readonly', False)]},)
-    correlativo = fields.Integer(string="Correlativo",
-    	readony=True,
+    correlativo = fields.Integer(
+        string="Correlativo",
+    	readonly=True,
         states={'draft': [('readonly', False)]},)
-    sec_envio = fields.Integer(string="Secuencia de Envío",
+    sec_envio = fields.Integer(
+        string="Secuencia de Envío",
         states={'draft': [('readonly', False)]},)
-    total_neto = fields.Monetary(compute='get_totales',
-           string="Total Neto")
-    total_iva = fields.Monetary(compute='get_totales',
-       string="Total Iva")
-    total_exento = fields.Monetary(compute='get_totales',
-       string="Total Exento")
-    total = fields.Monetary(compute='get_totales',
-       string="Monto Total")
-    total_boletas = fields.Integer(compute='get_totales',
-       string="Total Boletas")
-    company_id = fields.Many2one('res.company',
+    total_neto = fields.Monetary(
+        compute='get_totales',
+        string="Total Neto",
+    	readonly=True,
+        states={'draft': [('readonly', False)]},)
+    total_iva = fields.Monetary(
+        compute='get_totales',
+        string="Total Iva",
+    	readonly=True,
+        states={'draft': [('readonly', False)]},)
+    total_exento = fields.Monetary(
+        compute='get_totales',
+        string="Total Exento",
+    	readonly=True,
+        states={'draft': [('readonly', False)]},)
+    total = fields.Monetary(
+        compute='get_totales',
+        string="Monto Total",
+    	readonly=True,
+        states={'draft': [('readonly', False)]},)
+    total_boletas = fields.Integer(
+        compute='get_totales',
+        string="Total Boletas",
+    	readonly=True,
+        states={'draft': [('readonly', False)]},)
+    company_id = fields.Many2one(
+        'res.company',
         required=True,
         default=lambda self: self.env.user.company_id.id,
-    	readony=True,
+    	readonly=True,
         states={'draft': [('readonly', False)]},)
-    name = fields.Char(string="Detalle" , required=True,
-    	readony=True,
+    name = fields.Char(
+        string="Detalle" ,
+        required=True,
+    	readonly=True,
         states={'draft': [('readonly', False)]},)
-    date = fields.Date(string="Date", required=True,
-    	readony=True,
+    date = fields.Date(
+        string="Date",
+        required=True,
+    	readonly=True,
         states={'draft': [('readonly', False)]},)
-    detalles = fields.One2many('account.move.consumo_folios.detalles',
+    detalles = fields.One2many(
+        'account.move.consumo_folios.detalles',
        'cf_id',
-       string="Detalle Rangos")
-    impuestos = fields.One2many('account.move.consumo_folios.impuestos',
+       string="Detalle Rangos",
+       readonly=True,
+       states={'draft': [('readonly', False)]},)
+    impuestos = fields.One2many(
+        'account.move.consumo_folios.impuestos',
        'cf_id',
-       string="Detalle Impuestos")
-    currency_id = fields.Many2one('res.currency',
+       string="Detalle Impuestos",
+       readonly=True,
+       states={'draft': [('readonly', False)]},)
+    currency_id = fields.Many2one(
+        'res.currency',
         string='Moneda',
         default=lambda self: self.env.user.company_id.currency_id,
         required=True,
-        track_visibility='always')
+        track_visibility='always',
+    	readonly=True,
+        states={'draft': [('readonly', False)]},)
 
     _defaults = {
         'date' : datetime.now(),
