@@ -743,7 +743,7 @@ version="1.0">
         det['TpoDoc'] = rec.document_class_id.sii_code
         det['NroDoc'] = int(rec.sii_document_number)
         for a in self.anulaciones:
-            if a.rango_inicio <= det['NroDoc'] and det['NroDoc'] >= a.rango_final and a.tpo_doc == rec.document_class_id.id:
+            if a.rango_inicio <= det['NroDoc'] and det['NroDoc'] <= a.rango_final and a.tpo_doc.id == rec.document_class_id.id:
                 rec.canceled = True
         if rec.canceled:
             det['Anulado'] = 'A'
@@ -937,12 +937,13 @@ version="1.0">
                 resumen = self.getResumen(order)
                 TpoDoc = resumen['TpoDoc']
                 if not str(TpoDoc) in ant:
-                    ant[str(TpoDoc)] = 0
+                    ant[str(TpoDoc)] = [0, order.canceled]
                 TpoDocs.append(TpoDoc)
                 if not TpoDoc in resumenes:
                     resumenes[TpoDoc] = collections.OrderedDict()
-                resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc],((ant[str(TpoDoc)]+1) == order.sii_document_number))
-                ant[str(TpoDoc)] = order.sii_document_number
+                continuado = ((ant[str(TpoDoc)][0]+1) == order.sii_document_number and (ant[str(TpoDoc)][1]) == order.canceled)
+                resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc], continuado)
+                ant[str(TpoDoc)] = [order.sii_document_number, order.canceled]
         return resumenes, TpoDocs
 
     def _validar(self):
