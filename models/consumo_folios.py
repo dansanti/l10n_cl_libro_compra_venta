@@ -217,6 +217,9 @@ class ConsumoFolios(models.Model):
        string="Detalle Impuestos",
        readonly=True,
        states={'draft': [('readonly', False)]},)
+    anulaciones = fields.One2many('account.move.consumo_folios.anulaciones',
+       'cf_id',
+       string="Detalle Impuestos")
     currency_id = fields.Many2one(
         'res.currency',
         string='Moneda',
@@ -739,6 +742,12 @@ version="1.0">
 
         det['TpoDoc'] = rec.document_class_id.sii_code
         det['NroDoc'] = int(rec.sii_document_number)
+        for a in self.anulaciones:
+            if a.rango_inicio <= det['NroDoc'] and det['NroDoc'] >= a.rango_final and a.tpo_doc == rec.document_class_id.id:
+                rec.canceled = True
+        if rec.canceled:
+            det['Anulado'] = 'A'
+            return det
         Neto = 0
         MntExe = 0
         TaxMnt = 0
@@ -850,30 +859,31 @@ version="1.0">
 
     def _setResumen(self,resumen,resumenP,continuado=True):
         resumenP['TipoDocumento'] = resumen['TpoDoc']
-        if 'MntNeto' in resumen and not 'MntNeto' in resumenP:
-            resumenP['MntNeto'] = resumen['MntNeto']
-        elif 'MntNeto' in resumen:
-            resumenP['MntNeto'] += resumen['MntNeto']
-        elif not 'MntNeto' in resumenP:
-            resumenP['MntNeto'] = 0
-        if 'MntIVA' in resumen and not 'MntIva' in resumenP:
-            resumenP['MntIva'] = resumen['MntIVA']
-        elif 'MntIVA' in resumen:
-            resumenP['MntIva'] += resumen['MntIVA']
-        elif not 'MntIva' in resumenP:
-            resumenP['MntIva'] = 0
-        if 'TasaIVA' in resumen and not 'TasaIVA' in resumenP:
-            resumenP['TasaIVA'] = resumen['TasaIVA']
-        if 'MntExe' in resumen and not 'MntExento' in resumenP:
-            resumenP['MntExento'] = resumen['MntExe']
-        elif 'MntExe' in resumen:
-            resumenP['MntExento'] += resumen['MntExe']
-        elif not 'MntExento' in resumenP:
-            resumenP['MntExento'] = 0
-        if not 'MntTotal' in resumenP:
-            resumenP['MntTotal'] = resumen['MntTotal']
-        else:
-            resumenP['MntTotal'] += resumen['MntTotal']
+        if not 'Anulado' in resumen:
+            if 'MntNeto' in resumen and not 'MntNeto' in resumenP:
+                resumenP['MntNeto'] = resumen['MntNeto']
+            elif 'MntNeto' in resumen:
+                resumenP['MntNeto'] += resumen['MntNeto']
+            elif not 'MntNeto' in resumenP:
+                resumenP['MntNeto'] = 0
+            if 'MntIVA' in resumen and not 'MntIva' in resumenP:
+                resumenP['MntIva'] = resumen['MntIVA']
+            elif 'MntIVA' in resumen:
+                resumenP['MntIva'] += resumen['MntIVA']
+            elif not 'MntIva' in resumenP:
+                resumenP['MntIva'] = 0
+            if 'TasaIVA' in resumen and not 'TasaIVA' in resumenP:
+                resumenP['TasaIVA'] = resumen['TasaIVA']
+            if 'MntExe' in resumen and not 'MntExento' in resumenP:
+                resumenP['MntExento'] = resumen['MntExe']
+            elif 'MntExe' in resumen:
+                resumenP['MntExento'] += resumen['MntExe']
+            elif not 'MntExento' in resumenP:
+                resumenP['MntExento'] = 0
+            if not 'MntTotal' in resumenP:
+                resumenP['MntTotal'] = resumen['MntTotal']
+            else:
+                resumenP['MntTotal'] += resumen['MntTotal']
         if 'FoliosEmitidos' in resumenP:
             resumenP['FoliosEmitidos'] +=1
         else:
@@ -1122,3 +1132,19 @@ class DetalleImpuestos(models.Model):
         default=lambda self: self.env.user.company_id.currency_id,
         required=True,
         track_visibility='always')
+
+class Anulaciones(models.Model):
+    _name = 'account.move.consumo_folios.anulaciones'
+
+    cf_id = fields.Many2one('account.move.consumo_folios',
+                            string="Consumo de Folios")
+    tpo_doc = fields.Many2one('sii.document_class',
+        string="Tipo de documento",
+        required=True,
+        domain=[('sii_code','in',[ 39 , 41, 61])])
+    rango_inicio = fields.Integer(
+        required=True,
+        string="Rango Inicio")
+    rango_final = fields.Integer(
+        required=True,
+        string="Rango Final")

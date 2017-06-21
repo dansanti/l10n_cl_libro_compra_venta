@@ -81,6 +81,17 @@
                             </field>
                     </field>
                   </page>
+                  <page string="Anulaciones Manuales de Folio">
+                    <group>
+                      <field name="anulaciones" editable="bottom" widget="one2many">
+                        <tree editable="top/bottom">
+                          <field name="tpo_doc"/>
+                          <field name="rango_inicio" />
+                          <field name="rango_final" />
+                        </tree>
+                      </field>
+                    </group>
+                  </page>
                   <page string="Envio SII">
                     <group>
                       <field name='sii_message' attrs="{'invisible':[('state', 'in', ['','NoEnviado'])]}" readonly="1"/>
