@@ -258,7 +258,7 @@ class ConsumoFolios(models.Model):
             r.total_boletas = total_boletas
 
 
-    @api.onchange('move_ids')
+    @api.onchange('move_ids', 'anulaciones')
     @api.depends('move_ids')
     def _resumenes(self):
         resumenes, TpoDocs = self._get_resumenes()
