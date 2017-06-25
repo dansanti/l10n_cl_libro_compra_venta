@@ -935,17 +935,42 @@ version="1.0">
             ant = {}
             for order in orders_array:
                 resumen = self.getResumen(order)
-                TpoDoc = resumen['TpoDoc']
-                if not str(TpoDoc) in ant:
-                    ant[str(TpoDoc)] = [0, order.canceled]
-                TpoDocs.append(TpoDoc)
+                TpoDoc = str(resumen['TpoDoc'])
+                if not TpoDoc in ant:
+                    ant[TpoDoc] = [0, order.canceled]
+                if not TpoDoc in TpoDocs:
+                    TpoDocs.append(TpoDoc)
                 if not TpoDoc in resumenes:
                     resumenes[TpoDoc] = collections.OrderedDict()
-                continuado = ((ant[str(TpoDoc)][0]+1) == order.sii_document_number and (ant[str(TpoDoc)][1]) == order.canceled)
+                continuado = ((ant[TpoDoc][0]+1) == order.sii_document_number and (ant[TpoDoc][1]) == order.canceled)
                 resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc], continuado)
-                ant[str(TpoDoc)] = [order.sii_document_number, order.canceled]
+                ant[TpoDoc] = [order.sii_document_number, order.canceled]
+        for an in self.anulaciones:
+            TpoDoc = str(an.tpo_doc.sii_code)
+            if not TpoDoc in TpoDocs:
+                TpoDocs.append(TpoDoc)
+            i = an.rango_inicio
+            while i <= an.rango_final:
+                continuado  = False
+                seted = False
+                for r, value in resumenes.iteritems():
+                    Rangos = value[ str(r)+'_folios' ]
+                    if 'itemAnulados' in Rangos:
+                        _logger.info(Rangos['itemAnulados'])
+                        for rango in Rangos['itemAnulados']:
+                            if rango['Inicial'] <= i and i <= rango['Final']:
+                                seted = True
+                            if not(seted) and  (i-1) == rango['Final']:
+                                    continuado = True
+                if not seted:
+                    resumen = {
+                        'TpoDoc': TpoDoc,
+                        'NroDoc': i,
+                        'Anulado': 'A',
+                    }
+                    resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc], continuado)
+                i += 1
         return resumenes, TpoDocs
-
     def _validar(self):
         cant_doc_batch = 0
         company_id = self.company_id
