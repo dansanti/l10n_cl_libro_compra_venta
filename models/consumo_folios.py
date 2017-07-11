@@ -752,7 +752,9 @@ version="1.0">
         MntExe = 0
         TaxMnt = 0
         tasa = False
-        ivas = imp = impuestos = {}
+        ivas = {}
+        imp = {}
+        impuestos = {}
         if 'lines' in rec:
             for line in rec.lines:
                 if line.tax_ids:
