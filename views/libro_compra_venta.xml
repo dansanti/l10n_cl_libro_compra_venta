@@ -17,7 +17,7 @@
             <field name="name">l10n_cl.libro_compra_venta.tree</field>
             <field name="model">account.move.book</field>
             <field name="arch" type="xml">
-              <tree decoration-info="state == 'draft'" decoration-muted="state == 'cancel'">
+              <tree decoration-info="state == 'draft'" decoration-muted="state == 'cancel'" decoration-danger="state == 'Rechazado'">
                 <field name="name" />
                 <field name="periodo_tributario" />
                 <field name="date" />
