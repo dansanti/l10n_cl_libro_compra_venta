@@ -166,24 +166,19 @@ class ConsumoFolios(models.Model):
         states={'draft': [('readonly', False)]},)
     total_neto = fields.Monetary(
         string="Total Neto",
-    	readonly=True,
-        states={'draft': [('readonly', False)]},)
+        compute='get_totales',)
     total_iva = fields.Monetary(
         string="Total Iva",
-    	readonly=True,
-        states={'draft': [('readonly', False)]},)
+        compute='get_totales',)
     total_exento = fields.Monetary(
         string="Total Exento",
-    	readonly=True,
-        states={'draft': [('readonly', False)]},)
+        compute='get_totales',)
     total = fields.Monetary(
         string="Monto Total",
-    	readonly=True,
-        states={'draft': [('readonly', False)]},)
+        compute='get_totales',)
     total_boletas = fields.Integer(
         string="Total Boletas",
-    	readonly=True,
-        states={'draft': [('readonly', False)]},)
+        compute='get_totales',)
     company_id = fields.Many2one(
         'res.company',
         required=True,
@@ -233,6 +228,7 @@ class ConsumoFolios(models.Model):
     _order = 'fecha_inicio desc'
 
     @api.onchange('impuestos')
+    @api.depends('impuestos')
     def get_totales(self):
         for r in self:
             total_iva = 0
@@ -254,7 +250,6 @@ class ConsumoFolios(models.Model):
 
 
     @api.onchange('move_ids', 'anulaciones')
-    @api.depends('move_ids')
     def _resumenes(self):
         resumenes, TpoDocs = self._get_resumenes()
         if self.impuestos and isinstance(self.id, int):
@@ -916,7 +911,7 @@ version="1.0">
                 if not TpoDoc in resumenes:
                     resumenes[TpoDoc] = collections.OrderedDict()
                 resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc])
-            rec.sended = marc
+            #rec.sended = marc
         if 'pos.order' in self.env:
             current = self.fecha_inicio + ' 03:00:00'
             next_day = (datetime.strptime(current, DTF) + relativedelta.relativedelta(days=1)).strftime('%Y-%m-%d') + ' 03:00:00'

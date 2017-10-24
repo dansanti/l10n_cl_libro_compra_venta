@@ -274,7 +274,7 @@ class Libro(models.Model):
         operator = 'not in'
         query = [
             ('company_id', '=', self.company_id.id),
-            ('sended', '=', False),
+            #('sended', '=', False),
             ('date' , '<', next_month.strftime('%Y-%m-%d')),
             ]
         domain = 'sale'
@@ -290,7 +290,7 @@ class Libro(models.Model):
                 ('tipo_operacion','=', 'BOLETA'),
             ])
             cfs = self.env['account.move.consumo_folios'].search([
-                ('state','not in', ['draft']),
+                ('state','not in', [ 'draft', 'Rechazado']),
                 ('fecha_inicio','>=', current),
                 ('fecha_inicio','<', next_month),
             ])
