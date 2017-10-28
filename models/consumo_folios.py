@@ -227,6 +227,30 @@ class ConsumoFolios(models.Model):
 
     _order = 'fecha_inicio desc'
 
+    @api.model
+    def read_group(self, domain, fields, groupby, offset=0, limit=None, orderby=False, lazy=True):
+        res = super(ConsumoFolios, self).read_group(domain, fields, groupby, offset, limit=limit, orderby=orderby, lazy=lazy)
+        if 'total_iva' in fields:
+            for line in res:
+                if '__domain' in line:
+                    lines = self.search(line['__domain'])
+                    line.update({
+                            'total_neto': 0,
+                            'total_iva': 0,
+                            'total_exento': 0,
+                            'total': 0,
+                            'total_boletas': 0,
+                        })
+                    for l in lines:
+                        line.update({
+                                'total_neto': line['total_neto'] + l.total_neto,
+                                'total_iva': line['total_iva'] + l.total_iva,
+                                'total_exento': line['total_exento'] + l.total_exento,
+                                'total': line['total'] + l.total,
+                                'total_boletas': line['total_boletas'] + l.total_boletas,
+                            })
+        return res
+
     @api.onchange('impuestos')
     @api.depends('impuestos')
     def get_totales(self):
