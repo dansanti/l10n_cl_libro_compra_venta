@@ -160,10 +160,14 @@ class ConsumoFolios(models.Model):
     correlativo = fields.Integer(
         string="Correlativo",
     	readonly=True,
-        states={'draft': [('readonly', False)]},)
+        states={'draft': [('readonly', False)]},
+        invisible=True,
+    )
     sec_envio = fields.Integer(
         string="Secuencia de Envío",
-        states={'draft': [('readonly', False)]},)
+        readonly=True,
+        states={'draft': [('readonly', False)]},
+    )
     total_neto = fields.Monetary(
         string="Total Neto",
         compute='get_totales',)
@@ -336,7 +340,7 @@ class ConsumoFolios(models.Model):
             ('company_id', '=', self.company_id.id),
             ])
         if consumos > 0:
-            self.correlativo = (consumos+1)
+            self.sec_envio = (consumos+1)
 
     @api.multi
     def unlink(self):
