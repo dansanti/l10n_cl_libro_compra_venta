@@ -220,9 +220,9 @@ class ConsumoFolios(models.Model):
         states={'draft': [('readonly', False)]},)
 
     _defaults = {
-        'date' : datetime.now(),
-        'fecha_inicio': datetime.now().strftime('%Y-%m-%d'),
-        'fecha_final': datetime.now().strftime('%Y-%m-%d')
+        'date' : lambda *a: datetime.now(),
+        'fecha_inicio': lambda *a: datetime.now().strftime('%Y-%m-%d'),
+        'fecha_final': lambda *a: datetime.now().strftime('%Y-%m-%d')
     }
 
     _order = 'fecha_inicio desc'
