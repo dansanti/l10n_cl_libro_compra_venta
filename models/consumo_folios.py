@@ -137,9 +137,12 @@ class ConsumoFolios(models.Model):
         ('Proceso', 'Proceso'),
         ('Reenviar', 'Reenviar'),
         ('Anulado', 'Anulado')],
-        'Resultado'
-        , index=True, readonly=True, default='draft',
-        track_visibility='onchange', copy=False,
+        string='Resultado',
+        index=True,
+        readonly=True,
+        default='draft',
+        track_visibility='onchange',
+        copy=False,
         help=" * The 'Draft' status is used when a user is encoding a new and unconfirmed Invoice.\n"
              " * The 'Pro-forma' status is used the invoice does not have an invoice number.\n"
              " * The 'Open' status is used when user create invoice, an invoice number is generated. Its in open status till user does not pay invoice.\n"
@@ -215,13 +218,31 @@ class ConsumoFolios(models.Model):
        'cf_id',
        string="Detalle Impuestos")
     currency_id = fields.Many2one(
-        'res.currency',
-        string='Moneda',
-        default=lambda self: self.env.user.company_id.currency_id,
-        required=True,
-        track_visibility='always',
-    	readonly=True,
-        states={'draft': [('readonly', False)]},)
+            'res.currency',
+            string='Moneda',
+            default=lambda self: self.env.user.company_id.currency_id,
+            required=True,
+            track_visibility='always',
+        	readonly=True,
+            states={'draft': [('readonly', False)]},
+        )
+    responsable_envio = fields.Many2one(
+            'res.users',
+        )
+    sii_result = fields.Selection(
+            [
+                ('draft', 'Borrador'),
+                ('NoEnviado', 'No Enviado'),
+                ('Enviado', 'Enviado'),
+                ('Aceptado', 'Aceptado'),
+                ('Rechazado', 'Rechazado'),
+                ('Reparo', 'Reparo'),
+                ('Proceso', 'Proceso'),
+                ('Reenviar', 'Reenviar'),
+                ('Anulado', 'Anulado')
+            ],
+            related="state",
+        )
 
     _defaults = {
         'date' : lambda *a: datetime.now(),
@@ -1083,6 +1104,14 @@ version="1.0">
         envio_dte, doc_id =  self._validar()
         company_id = self.company_id
         result = self.send_xml_file(envio_dte, doc_id, company_id)
+        if result['sii_result'] == 'Enviado':
+            self.env['sii.cola_envio'].create(
+                    {
+                        'doc_ids':[self.id],
+                        'model':'account.move.consumo_folios',
+                        'user_id':self.env.user.id,
+                        'tipo_trabajo': 'consulta',
+                    })
         self.write({
             'sii_xml_response':result['sii_xml_response'],
             'sii_send_ident':result['sii_send_ident'],
