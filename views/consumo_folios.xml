@@ -5,7 +5,7 @@
             <field name="name">l10n_cl.libro_compra_venta.tree</field>
             <field name="model">account.move.consumo_folios</field>
             <field name="arch" type="xml">
-              <tree decoration-info="state == 'draft'" decoration-muted="state == 'cancel'">
+              <tree decoration-info="state == 'draft'" decoration-muted="state == 'cancel'" decoration-danger="state == 'Rechazado'" decoration-bf="state == 'NoEnviado'">
                 <field name="name" />
                 <field name="fecha_inicio" />
                 <field name="fecha_final" />
