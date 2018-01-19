@@ -759,7 +759,7 @@ version="1.0">
             c += 1
         return cadena
 
-    def _process_imps(self, tax_line_id, totales=0, currency=None, Neto=0, TaxMnt=0, MntExe=0, ivas={}, imp={}):
+    def _process_imps(self, tax_line_id, totales=0, currency=None, Neto=0, TaxMnt=0, MntExe=0, ivas={}):
         mnt = tax_line_id.compute_all(totales,  currency, 1)['taxes'][0]
         if mnt['amount'] < 0:
             mnt['amount'] *= -1
@@ -770,11 +770,9 @@ version="1.0">
             TaxMnt += mnt['amount']
             Neto += mnt['base']
         else:
-            imp.setdefault(tax_line_id.id, [tax_line_id, 0])
-            imp[tax_line_id.id][1] += mnt['amount']
             if tax_line_id.amount == 0:
                 MntExe += mnt['base']
-        return Neto, TaxMnt, MntExe, ivas, imp
+        return Neto, TaxMnt, MntExe, ivas
 
     def getResumen(self, rec):
         det = collections.OrderedDict()
@@ -792,7 +790,6 @@ version="1.0">
         TaxMnt = 0
         tasa = False
         ivas = {}
-        imp = {}
         impuestos = {}
         if 'lines' in rec:
             for line in rec.lines:
@@ -801,7 +798,7 @@ version="1.0">
                         impuestos.setdefault(t.id, [t, 0])
                         impuestos[t.id][1] += line.price_subtotal_incl
             for key, t in impuestos.iteritems():
-                Neto, TaxMnt, MntExe, ivas, imp = self._process_imps(t[0], t[1], rec.pricelist_id.currency_id, Neto, TaxMnt, MntExe, ivas, imp)
+                Neto, TaxMnt, MntExe, ivas = self._process_imps(t[0], t[1], rec.pricelist_id.currency_id, Neto, TaxMnt, MntExe, ivas)
         else:  # si la boleta fue hecha por contabilidad
             for l in rec.line_ids:
                 if l.tax_line_id:
@@ -813,15 +810,6 @@ version="1.0">
                                 ivas[l.tax_line_id.id][1] += l.credit
                             else:
                                 ivas[l.tax_line_id.id][1] += l.debit
-                        else:
-                            if not l.tax_line_id.id in imp:
-                                imp[l.tax_line_id.id] = [l.tax_line_id, 0]
-                            if l.credit > 0:
-                                imp[l.tax_line_id.id][1] += l.credit
-                                TaxMnt += l.credit
-                            else:
-                                imp[l.tax_line_id.id][1] += l.debit
-                                TaxMnt += l.debit
                 elif l.tax_ids and l.tax_ids[0].amount > 0:
                     if l.credit > 0:
                         Neto += l.credit
@@ -1015,6 +1003,7 @@ version="1.0">
                     resumenes[TpoDoc] = self._setResumen(resumen, resumenes[TpoDoc], continuado)
                 i += 1
         return resumenes, TpoDocs
+
     def _validar(self):
         cant_doc_batch = 0
         company_id = self.company_id
