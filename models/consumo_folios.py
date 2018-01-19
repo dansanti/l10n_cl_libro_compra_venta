@@ -759,20 +759,23 @@ version="1.0">
             c += 1
         return cadena
 
-    def _process_imps(self, tax_line_id, totales=0, currency=None, Neto=0, TaxMnt=0, MntExe=0, ivas={}):
+    def _es_iva(self, tax):
+        if tax.sii_code in [14, 15, 17, 18, 19, 30,31, 32 ,33, 34, 36, 37, 38, 39, 41, 47, 48]:
+            return True
+        return False
+
+    def _process_imps(self, tax_line_id, totales=0, currency=None, Neto=0, TaxMnt=0, MntExe=0):
         mnt = tax_line_id.compute_all(totales,  currency, 1)['taxes'][0]
         if mnt['amount'] < 0:
             mnt['amount'] *= -1
             mnt['base'] *= -1
-        if tax_line_id.sii_code in [14, 15, 17, 18, 19, 30,31, 32 ,33, 34, 36, 37, 38, 39, 41, 47, 48]: # diferentes tipos de IVA retenidos o no
-            ivas.setdefault(tax_line_id.id, [ tax_line_id, 0])
-            ivas[tax_line_id.id][1] += mnt['amount']
+        if self._es_iva(tax_line_id): # diferentes tipos de IVA retenidos o no @TODO investigar si se aplican a boletas
             TaxMnt += mnt['amount']
             Neto += mnt['base']
         else:
             if tax_line_id.amount == 0:
                 MntExe += mnt['base']
-        return Neto, TaxMnt, MntExe, ivas
+        return Neto, TaxMnt, MntExe
 
     def getResumen(self, rec):
         det = collections.OrderedDict()
@@ -788,28 +791,29 @@ version="1.0">
         Neto = 0
         MntExe = 0
         TaxMnt = 0
-        tasa = False
-        ivas = {}
+        Tasa = False
         impuestos = {}
         if 'lines' in rec:
-            for line in rec.lines:
+            for line in rec.lines:# agrupo las líneas para calcular iva global
                 if line.tax_ids:
                     for t in line.tax_ids:
+                        if not Tasa and self._es_iva(t):
+                            Tasa = t.aamount
                         impuestos.setdefault(t.id, [t, 0])
                         impuestos[t.id][1] += line.price_subtotal_incl
             for key, t in impuestos.iteritems():
-                Neto, TaxMnt, MntExe, ivas = self._process_imps(t[0], t[1], rec.pricelist_id.currency_id, Neto, TaxMnt, MntExe, ivas)
+                Neto, TaxMnt, MntExe = self._process_imps(t[0], t[1], rec.pricelist_id.currency_id, Neto, TaxMnt, MntExe)
         else:  # si la boleta fue hecha por contabilidad
             for l in rec.line_ids:
                 if l.tax_line_id:
                     if l.tax_line_id and l.tax_line_id.amount > 0: #supuesto iva único
-                        if l.tax_line_id.sii_code in [14, 15, 17, 18, 19, 30,31, 32 ,33, 34, 36, 37, 38, 39, 41, 47, 48]: # diferentes tipos de IVA retenidos o no
-                            if not l.tax_line_id.id in ivas:
-                                ivas[l.tax_line_id.id] = [l.tax_line_id, 0]
+                        if self._es_iva(l.tax_line_id): # diferentes tipos de IVA retenidos o no
+                            if not Tasa:
+                                Tasa = l.tax_line_id.amount
                             if l.credit > 0:
-                                ivas[l.tax_line_id.id][1] += l.credit
+                                TaxMnt += l.credit
                             else:
-                                ivas[l.tax_line_id.id][1] += l.debit
+                                TaxMnt += l.debit
                 elif l.tax_ids and l.tax_ids[0].amount > 0:
                     if l.credit > 0:
                         Neto += l.credit
@@ -824,8 +828,7 @@ version="1.0">
             det['MntExe'] = int(round(MntExe,0))
         if TaxMnt > 0:
             det['MntIVA'] = int(round(TaxMnt))
-            for key, t in ivas.iteritems():
-                det['TasaIVA'] = t[0].amount
+            det['TasaIVA'] = Tasa
         monto_total = int(round((Neto + MntExe + TaxMnt), 0))
         det['MntNeto'] = int(round(Neto))
         det['MntTotal'] = monto_total
