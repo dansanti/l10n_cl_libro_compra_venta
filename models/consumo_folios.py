@@ -818,9 +818,9 @@ version="1.0">
                             if not Tasa:
                                 Tasa = l.tax_line_id.amount
                             if l.credit > 0:
-                                TaxMnt += l.debit
+                                TaxMnt += l.credit
                             else:
-                                ivas[l.tax_line_id.id][1] += l.debit
+                                TaxMnt += l.debit
                 elif l.tax_ids and l.tax_ids[0].amount > 0:
                     if l.credit > 0:
                         Neto += l.credit
