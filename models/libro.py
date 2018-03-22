@@ -237,45 +237,51 @@ class Libro(models.Model):
         compute='set_resumen',
         store=True,)
     periodo_tributario = fields.Char(
-        string='Periodo Tributario',
-        required=True,
-        readonly=True,
-        states={'draft': [('readonly', False)]})
+            string='Periodo Tributario',
+            required=True,
+            readonly=True,
+            states={'draft': [('readonly', False)]},
+            default=lambda *a: datetime.now().strftime('%Y-%m'),
+        )
     company_id = fields.Many2one('res.company',
-        string="Compañía",
-        required=True,
-        default=lambda self: self.env.user.company_id.id,
-        readonly=True,
-        states={'draft': [('readonly', False)]})
+            string="Compañía",
+            required=True,
+            default=lambda self: self.env.user.company_id.id,
+            readonly=True,
+            states={'draft': [('readonly', False)]},
+        )
     name = fields.Char(
-        string="Detalle",
-        required=True,
-        readonly=True,
-        states={'draft': [('readonly', False)]})
+            string="Detalle",
+            required=True,
+            readonly=True,
+            states={'draft': [('readonly', False)]},
+        )
     fact_prop = fields.Float(
-        string="Factor proporcionalidad",
-        readonly=True,
-        states={'draft': [('readonly', False)]})
+            string="Factor proporcionalidad",
+            readonly=True,
+            states={'draft': [('readonly', False)]},
+        )
     nro_segmento = fields.Integer(
-        string="Número de Segmento",
-        readonly=True,
-        states={'draft': [('readonly', False)]})
+            string="Número de Segmento",
+            readonly=True,
+            states={'draft': [('readonly', False)]},
+        )
     date = fields.Date(
-        string="Fecha",
-        required=True,
-        readonly=True,
-        states={'draft': [('readonly', False)]})
+            string="Fecha",
+            required=True,
+            readonly=True,
+            states={'draft': [('readonly', False)]},
+            default=lambda *a: datetime.now(),
+        )
     boletas = fields.One2many('account.move.book.boletas',
-        'book_id',
-        string="Boletas",
-        readonly=True,
-        states={'draft': [('readonly', False)]})
-    codigo_rectificacion = fields.Char(string="Código de Rectificación")
-
-    _defaults = {
-        'date' : datetime.now(),
-        'periodo_tributario': datetime.now().strftime('%Y-%m'),
-    }
+            'book_id',
+            string="Boletas",
+            readonly=True,
+            states={'draft': [('readonly', False)]},
+        )
+    codigo_rectificacion = fields.Char(
+            string="Código de Rectificación",
+        )
 
     @api.onchange('periodo_tributario', 'tipo_operacion', 'company_id')
     def set_movimientos(self):

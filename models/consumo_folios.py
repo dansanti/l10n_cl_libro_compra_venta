@@ -161,17 +161,22 @@ class ConsumoFolios(models.Model):
              " * The 'Paid' status is set automatically when the invoice is paid. Its related journal entries may or may not be reconciled.\n"
              " * The 'Cancelled' status is used when user cancel invoice.")
     move_ids = fields.Many2many(
-        'account.move',
-    	readonly=True,
-        states={'draft': [('readonly', False)]},)
+            'account.move',
+        	readonly=True,
+            states={'draft': [('readonly', False)]},
+        )
     fecha_inicio = fields.Date(
-        string="Fecha Inicio",
-    	readonly=True,
-        states={'draft': [('readonly', False)]},)
+            string="Fecha Inicio",
+        	readonly=True,
+            states={'draft': [('readonly', False)]},
+            default=lambda *a: datetime.now().strftime('%Y-%m-%d'),
+        )
     fecha_final = fields.Date(
-        string="Fecha Final",
-    	readonly=True,
-        states={'draft': [('readonly', False)]},)
+            string="Fecha Final",
+        	readonly=True,
+            states={'draft': [('readonly', False)]},
+            default=lambda *a: datetime.now().strftime('%Y-%m-%d'),
+        )
     correlativo = fields.Integer(
         string="Correlativo",
     	readonly=True,
@@ -205,30 +210,37 @@ class ConsumoFolios(models.Model):
     	readonly=True,
         states={'draft': [('readonly', False)]},)
     name = fields.Char(
-        string="Detalle" ,
-        required=True,
-    	readonly=True,
-        states={'draft': [('readonly', False)]},)
+            string="Detalle" ,
+            required=True,
+        	readonly=True,
+            states={'draft': [('readonly', False)]},
+        )
     date = fields.Date(
-        string="Date",
-        required=True,
-    	readonly=True,
-        states={'draft': [('readonly', False)]},)
+            string="Date",
+            required=True,
+        	readonly=True,
+            states={'draft': [('readonly', False)]},
+            default=lambda *a: datetime.now(),
+        )
     detalles = fields.One2many(
-        'account.move.consumo_folios.detalles',
-       'cf_id',
-       string="Detalle Rangos",
-       readonly=True,
-       states={'draft': [('readonly', False)]},)
+            'account.move.consumo_folios.detalles',
+            'cf_id',
+            string="Detalle Rangos",
+            readonly=True,
+            states={'draft': [('readonly', False)]},
+        )
     impuestos = fields.One2many(
-        'account.move.consumo_folios.impuestos',
-       'cf_id',
-       string="Detalle Impuestos",
-       readonly=True,
-       states={'draft': [('readonly', False)]},)
-    anulaciones = fields.One2many('account.move.consumo_folios.anulaciones',
-       'cf_id',
-       string="Detalle Impuestos")
+            'account.move.consumo_folios.impuestos',
+            'cf_id',
+            string="Detalle Impuestos",
+            readonly=True,
+            states={'draft': [('readonly', False)]},
+        )
+    anulaciones = fields.One2many(
+            'account.move.consumo_folios.anulaciones',
+            'cf_id',
+            string="Detalle Impuestos",
+        )
     currency_id = fields.Many2one(
             'res.currency',
             string='Moneda',
@@ -255,12 +267,6 @@ class ConsumoFolios(models.Model):
             ],
             related="state",
         )
-
-    _defaults = {
-        'date' : lambda *a: datetime.now(),
-        'fecha_inicio': lambda *a: datetime.now().strftime('%Y-%m-%d'),
-        'fecha_final': lambda *a: datetime.now().strftime('%Y-%m-%d')
-    }
 
     _order = 'fecha_inicio desc'
 
@@ -978,7 +984,7 @@ version="1.0">
             recs = sorted(recs, key=lambda t: t.sii_document_number)
             ant = {}
             for order in recs:
-                canceled = (hasattr(order,'canceled') and order.canceled) 
+                canceled = (hasattr(order,'canceled') and order.canceled)
                 resumen = self.getResumen(order)
                 TpoDoc = str(resumen['TpoDoc'])
                 if not TpoDoc in ant:
